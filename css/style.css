@@ -1,0 +1,224 @@
+/* ---------- Barvy a proměnné ---------- */
+:root {
+  --bg: #0A0A0A;
+  --surface: #161618;
+  --border: #2A2A2D;
+  --accent: #7A1C2A;
+  --danger: #B0141E;
+  --gold: #C8A04A;
+  --text: #ECEAE6;
+  --text-2: #8E8B87;
+  --on-accent: #ECEAE6;
+
+  --font-head: "Big Shoulders Display", "Barlow Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
+  --font-body: "Barlow", -apple-system, "Helvetica Neue", Arial, sans-serif;
+
+  --tap: 48px;
+  --gutter: 16px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+:root[data-theme="light"] {
+  --bg: #F2F0EC;
+  --surface: #FFFFFF;
+  --border: #D6D3CE;
+  --accent: #7A1C2A;
+  --danger: #B0141E;
+  --gold: #9A7420;
+  --text: #161618;
+  --text-2: #6B6864;
+}
+
+/* ---------- Základ ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
+body { overflow: hidden; }
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+
+/* ---------- Horní lišta ---------- */
+.topbar {
+  flex: none;
+  padding: calc(var(--safe-top) + 12px) var(--gutter) 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.screen-title {
+  margin: 0;
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ---------- Obsah ---------- */
+.view {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: var(--gutter);
+  outline: none;
+}
+
+.stack > * + * { margin-top: var(--gutter); }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: var(--gutter);
+}
+
+.card-title {
+  margin: 0 0 10px;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0.03em;
+}
+
+.muted { color: var(--text-2); }
+.small { font-size: 15px; }
+
+/* ---------- Tlačítka ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap);
+  padding: 0 20px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.btn:active { transform: translateY(1px); filter: brightness(1.15); }
+.btn:disabled { opacity: 0.45; cursor: default; transform: none; filter: none; }
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.btn-hero {
+  width: 100%;
+  min-height: 72px;
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: 28px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.btn-small { min-height: 40px; padding: 0 14px; font-size: 15px; }
+
+/* ---------- Seznam klíč–hodnota ---------- */
+.kv { margin: 0; }
+.kv-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.kv-row:first-child { border-top: 0; padding-top: 0; }
+.kv-row:last-child { padding-bottom: 0; }
+.kv dt { color: var(--text-2); }
+.kv dd { margin: 0; text-align: right; font-weight: 600; }
+.ok { color: var(--text); }
+.warn { color: var(--danger); }
+
+/* ---------- Lišta nové verze ---------- */
+.update-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px var(--gutter);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  font-size: 15px;
+}
+
+/* ---------- Spodní navigace ---------- */
+.tabbar {
+  flex: none;
+  display: flex;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding-bottom: var(--safe-bottom);
+}
+
+.tab {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 2px;
+  color: var(--text-2);
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-top: 2px solid transparent;
+  margin-top: -1px;
+}
+
+.tab svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+}
+
+.tab.is-active {
+  color: var(--text);
+  border-top-color: var(--accent);
+}
