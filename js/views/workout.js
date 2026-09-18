@@ -50,7 +50,14 @@ export async function render(container, { extraEl, titleEl }) {
   const prior = [...done, ...manualAsWorkouts(manual, exercises)];
   const ctx = {
     save, saveLater, exercises, prior, priorRecords: computeRecords(prior),
-    progress: progressBar(),
+    progress: progressBar((ex, slot) => {
+      const target = workout.exercises[ex];
+      if (!target) return;
+      const c = workout.cursor;
+      if (c && c.ex === ex && c.slot === slot) return;
+      const dir = !c || ex > c.ex || (ex === c.ex && slot > c.slot) ? 1 : -1;
+      ctx.move(dir, () => { target.skipped = false; workout.cursor = { ex, slot }; });
+    }),
     draw: () => {
       container.replaceChildren(...screen(workout, ctx), ...(workout.exercises.length ? [ctx.progress.root] : []));
       ctx.progress.update(workout);
@@ -210,7 +217,7 @@ function currentCard(workout, cur, ctx) {
       onclick: () => {
         const record = isNewRecord(workout, cur, ctx);
         card.classList.add('is-confirmed');
-        if (record) { celebrate(); toast('Nový osobní rekord!'); }
+        if (record) { cur.slot.pr = true; celebrate(); toast('Nový osobní rekord!'); }
         ctx.move(1, () => completeCurrent(workout));
       },
     }, [el('span', { class: 'btn-done-label', text: label }), el('span', { class: 'btn-done-arrow', text: arrow })]),
@@ -422,8 +429,20 @@ async function exerciseListSheet(workout, ctx) {
 // ---------- Ukazatel postupu (jako kapitoly na YouTube) ----------
 // Cviky jsou oddělené větší mezerou s čárkou, série menší mezerou.
 // Hotové série se plynule vyplní rudou.
-function progressBar() {
-  const root = el('div', { class: 'wprog', role: 'progressbar', 'aria-label': 'Postup tréninku', 'aria-valuemin': 0, 'aria-valuemax': 100 });
+function progressBar(onJump) {
+  const root = el('div', { class: 'wprog', role: 'progressbar', 'aria-label': 'Postup tréninku, klepnutím přejdeš na sérii', 'aria-valuemin': 0, 'aria-valuemax': 100 });
+  // klepnutí: cvik podle bloku, série podle místa v bloku
+  root.addEventListener('click', (e) => {
+    const group = e.target.closest('.wprog-ex') ?? [...root.children].find((g) => {
+      const b = g.getBoundingClientRect();
+      return e.clientX >= b.left && e.clientX <= b.right;
+    });
+    if (!group) return;
+    const ex = [...root.children].indexOf(group);
+    const slots = [...group.children];
+    const hit = slots.findIndex((sl) => e.clientX <= sl.getBoundingClientRect().right + 1);
+    onJump(ex, hit === -1 ? slots.length - 1 : hit);
+  });
   let signature = '';
   let slotEls = [];
   return {
@@ -444,6 +463,7 @@ function progressBar() {
           if (slot.done) done++;
           const node = slotEls[i][k];
           node.classList.toggle('is-done', slot.done);
+          node.classList.toggle('is-pr', Boolean(slot.pr && slot.done));
           node.classList.toggle('is-current', workout.cursor?.ex === i && workout.cursor?.slot === k);
         });
       });
