@@ -20,18 +20,19 @@ export const tab = 'domu';
 
 const SCALES = [['energy', t('Energie')], ['sleep', t('Spánek')], ['food', t('Jídlo')]];
 
-export async function render(container, { params }) {
+export async function render(container, { params, extraEl }) {
   const id = params[0];
   const workout = id ? await getWorkout(id) : await getActiveWorkout();
   const state = { editing: false };
   const draw = async () => {
     container.replaceChildren();
-    await drawSummary(container, workout, id, state, draw);
+    extraEl.replaceChildren();
+    await drawSummary(container, workout, id, state, draw, extraEl);
   };
   await draw();
 }
 
-async function drawSummary(container, workout, id, state, redraw) {
+async function drawSummary(container, workout, id, state, redraw, extraEl) {
   if (!workout) {
     container.append(el('section', { class: 'card' }, [
       el('h2', { class: 'card-title', text: id ? t('Trénink nenalezen') : t('Žádný rozdělaný trénink') }),
@@ -168,7 +169,7 @@ async function drawSummary(container, workout, id, state, redraw) {
   comment.value = workout.comment ?? '';
   // u jídla je optimum uprostřed, proto popisky
   const hints = { food: [t('nic'), t('akorát'), t('přejedený')] };
-  stack.append(el('section', { class: 'card' }, [
+  const howCard = el('section', { class: 'card' }, [
     el('h2', { class: 'card-title', text: t('Jak to šlo') }),
     ...SCALES.map(([key, label]) => el('div', { class: 'scale-block' }, [
       el('div', { class: 'scale-row' }, [
@@ -184,7 +185,10 @@ async function drawSummary(container, workout, id, state, redraw) {
       hints[key] ? el('div', { class: 'scale-hints' }, hints[key].map((h) => el('span', { text: h }))) : null,
     ])),
     comment,
-  ]));
+  ]);
+  // při vyplňování hned pod hlavičkou, ať není potřeba scrollovat
+  if (editable) stack.children[0].after(howCard);
+  else stack.append(howCard);
 
   // Oslava: nový rekord nebo splněný cíl (jen při ukončení tréninku)
   if (workout.status === 'active' && !state.celebrated && (records.length || stack.querySelector('.card-gold li.gold'))) {
@@ -192,61 +196,43 @@ async function drawSummary(container, workout, id, state, redraw) {
     setTimeout(celebrate, 250);
   }
 
-  // Akce
+  // Akce v horní liště (vždy vidět bez scrollování)
+  const btn = (text, cls, onclick) => el('button', { type: 'button', class: `btn btn-small ${cls}`.trim(), text, onclick });
   if (workout.status === 'active') {
-    stack.append(el('div', { class: 'stack' }, [
-      el('button', {
-        type: 'button', class: 'btn btn-primary btn-hero',
-        text: t('Uložit trénink'),
-        onclick: async () => {
-          await finishWorkout(workout, { scales, comment: comment.value.trim() });
-          const [goals, all, measurements] = await Promise.all([listGoals(), listDoneWorkouts(), listMeasurements()]);
-          const reached = await markReachedGoals(goals, all, measurements);
-          toast(reached.length ? t('Trénink uložen, cíl splněn!') : t('Trénink uložen'));
-          navigate('domu');
-        },
+    extraEl.append(
+      btn(t('← Trénink'), '', async () => { workout.endedAt = null; await saveWorkout(workout); navigate('trenink'); }),
+      btn(t('Uložit'), 'btn-primary', async () => {
+        await finishWorkout(workout, { scales, comment: comment.value.trim() });
+        const [goals, all, measurements] = await Promise.all([listGoals(), listDoneWorkouts(), listMeasurements()]);
+        const reached = await markReachedGoals(goals, all, measurements);
+        toast(reached.length ? t('Trénink uložen, cíl splněn!') : t('Trénink uložen'));
+        navigate('domu');
       }),
-      el('button', {
-        type: 'button', class: 'btn', text: t('Zpět do tréninku'),
-        onclick: async () => { workout.endedAt = null; await saveWorkout(workout); navigate('trenink'); },
-      }),
-    ]));
+    );
   } else if (state.editing) {
-    stack.append(el('div', { class: 'row-2' }, [
-      el('button', {
-        type: 'button', class: 'btn', text: t('Zrušit'),
-        onclick: async () => {
-          Object.assign(workout, await getWorkout(workout.id)); // zahodit neuložené úpravy
-          state.editing = false;
-          await redraw();
-        },
+    extraEl.append(
+      btn(t('Zrušit'), '', async () => {
+        Object.assign(workout, await getWorkout(workout.id)); // zahodit neuložené úpravy
+        state.editing = false;
+        await redraw();
       }),
-      el('button', {
-        type: 'button', class: 'btn btn-primary', text: t('Uložit změny'),
-        onclick: async () => {
-          workout.scales = scales;
-          workout.comment = comment.value.trim();
-          await saveWorkout(workout);
-          state.editing = false;
-          toast(t('Změny uloženy'));
-          await redraw();
-        },
+      btn(t('Uložit'), 'btn-primary', async () => {
+        workout.scales = scales;
+        workout.comment = comment.value.trim();
+        await saveWorkout(workout);
+        state.editing = false;
+        toast(t('Změny uloženy'));
+        await redraw();
       }),
-    ]));
+    );
   } else {
-    stack.append(el('div', { class: 'row-2' }, [
-      el('button', {
-        type: 'button', class: 'btn', text: t('Upravit'),
-        onclick: async () => { state.editing = true; await redraw(); },
+    extraEl.append(
+      btn(t('Upravit'), '', async () => { state.editing = true; await redraw(); }),
+      btn(t('Smazat'), 'btn-danger', async () => {
+        const ok = await confirmDialog({ title: t('Smazat tento trénink?'), text: t('Záznam zmizí z historie i ze statistik.'), okLabel: t('Smazat'), danger: true });
+        if (ok) { await deleteWorkout(workout.id); toast(t('Trénink smazán')); navigate('domu'); }
       }),
-      el('button', {
-        type: 'button', class: 'btn btn-danger', text: t('Smazat trénink'),
-        onclick: async () => {
-          const ok = await confirmDialog({ title: t('Smazat tento trénink?'), text: t('Záznam zmizí z historie i ze statistik.'), okLabel: t('Smazat'), danger: true });
-          if (ok) { await deleteWorkout(workout.id); toast(t('Trénink smazán')); navigate('domu'); }
-        },
-      }),
-    ]));
+    );
   }
 }
 

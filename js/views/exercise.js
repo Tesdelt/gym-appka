@@ -30,12 +30,12 @@ export async function render(container, { params, extraEl, titleEl }) {
 
   if (params[0] === 'db' || (params[0] === 'novy' && params[1] === 'db')) {
     titleEl.textContent = t('Katalog');
-    await renderCatalogItem(container, params[0] === 'db' ? params[1] : params[2]);
+    await renderCatalogItem(container, params[0] === 'db' ? params[1] : params[2], extraEl);
     return;
   }
   if (params[0] === 'novy') {
     titleEl.textContent = t('Nový cvik');
-    renderForm(container, emptyDraft(), { isNew: true });
+    renderForm(container, emptyDraft(), { isNew: true, extraEl });
     return;
   }
 
@@ -46,10 +46,10 @@ export async function render(container, { params, extraEl, titleEl }) {
   }
   if (params[1] === 'upravit') {
     titleEl.textContent = t('Upravit cvik');
-    renderForm(container, structuredClone(exercise), { isNew: false });
+    renderForm(container, structuredClone(exercise), { isNew: false, extraEl });
     return;
   }
-  await renderDetail(container, exercise);
+  await renderDetail(container, exercise, extraEl);
 }
 
 function goBack() {
@@ -58,7 +58,7 @@ function goBack() {
 }
 
 // ---------- Detail ----------
-async function renderDetail(container, exercise) {
+async function renderDetail(container, exercise, extraEl) {
   const [done, gyms, templates, lastGymId, goals, manual] = await Promise.all([listDoneWorkouts(), listGyms(), listTemplates(), getLastGymId(), listGoals(), listManualRecords()]);
   const manualSessions = manualAsWorkouts(manual.filter((m) => m.exerciseId === exercise.id), new Map([[exercise.id, exercise]]));
   const records = computeRecords([...done, ...manualSessions]);
@@ -66,6 +66,28 @@ async function renderDetail(container, exercise) {
 
   const stack = el('div', { class: 'stack' });
   container.append(stack);
+
+  // Akce v horní liště
+  extraEl.append(...[
+    el('button', { type: 'button', class: 'btn btn-small', text: t('Upravit'), onclick: () => navigate(`cvik/${encodeURIComponent(exercise.id)}/upravit`) }),
+    el('button', {
+      type: 'button', class: 'btn btn-small btn-danger', text: t('Smazat'),
+      onclick: async () => {
+        const using = await templatesUsing(exercise.id);
+        if (using.length) {
+          toast(t('Cvik je v tréninku {names}, nejdřív ho odeber ze šablony', { names: using.map((tpl) => tpl.name).join(', ') }));
+          return;
+        }
+        const ok = await confirmDialog({ title: t('Smazat „{name}“?', { name: exName(exercise) }), text: t('Z encyklopedie zmizí. Odcvičené série v historii zůstanou.'), okLabel: t('Smazat'), danger: true });
+        if (!ok) return;
+        await deleteExercise(exercise.id);
+        if (exercise.photoId) await deleteImage(exercise.photoId);
+        for (const ref of exercise.images ?? []) if (ref.startsWith('idb:')) await deleteImage(ref.slice(4));
+        toast(t('Cvik smazán'));
+        navigate('cviky');
+      },
+    }),
+  ]);
 
   // Obrázek a název
   const pic = imageBox(exercise, { cls: 'ex-hero', toggle: true });
@@ -158,31 +180,11 @@ async function renderDetail(container, exercise) {
     stack.append(el('section', { class: 'card' }, [el('h3', { class: 'card-title', text: t('Tipy') }), el('p', { class: 'prose', text: exText(exercise, 'tips') })]));
   }
 
-  // Akce
-  stack.append(el('div', { class: 'row-2' }, [
-    el('button', { type: 'button', class: 'btn', text: t('Upravit'), onclick: () => navigate(`cvik/${encodeURIComponent(exercise.id)}/upravit`) }),
-    el('button', {
-      type: 'button', class: 'btn btn-danger', text: t('Smazat cvik'),
-      onclick: async () => {
-        const using = await templatesUsing(exercise.id);
-        if (using.length) {
-          toast(t('Cvik je v tréninku {names}, nejdřív ho odeber ze šablony', { names: using.map((tpl) => tpl.name).join(', ') }));
-          return;
-        }
-        const ok = await confirmDialog({ title: t('Smazat „{name}“?', { name: exName(exercise) }), text: t('Z encyklopedie zmizí. Odcvičené série v historii zůstanou.'), okLabel: t('Smazat'), danger: true });
-        if (!ok) return;
-        await deleteExercise(exercise.id);
-        if (exercise.photoId) await deleteImage(exercise.photoId);
-        for (const ref of exercise.images ?? []) if (ref.startsWith('idb:')) await deleteImage(ref.slice(4));
-        toast(t('Cvik smazán'));
-        navigate('cviky');
-      },
-    }),
-  ]));
 
   function refresh() {
     container.replaceChildren();
-    renderDetail(container, exercise);
+    extraEl.querySelectorAll('.btn:not(:first-child)').forEach((b) => b.remove());
+    renderDetail(container, exercise, extraEl);
   }
 }
 
@@ -208,7 +210,7 @@ function emptyDraft() {
   };
 }
 
-async function renderForm(container, draft, { isNew }) {
+async function renderForm(container, draft, { isNew, extraEl }) {
   const gyms = await listGyms();
   const fmt = (v) => new Intl.NumberFormat(locale, { maximumFractionDigits: 2, useGrouping: false }).format(v);
   const parseNum = (v) => parseFloat(String(v).replace(',', '.'));
@@ -275,7 +277,7 @@ async function renderForm(container, draft, { isNew }) {
 
   const list = (v) => v.split(',').map((x) => x.trim()).filter(Boolean);
   const saveBtn = el('button', {
-    type: 'button', class: 'btn btn-primary btn-hero', text: isNew ? t('Přidat cvik') : t('Uložit'),
+    type: 'button', class: 'btn btn-small btn-primary', text: isNew ? t('Přidat') : t('Uložit'),
     onclick: async () => {
       const n = name.value.trim();
       if (!n) { toast(t('Vyplň název')); name.focus(); return; }
@@ -326,8 +328,8 @@ async function renderForm(container, draft, { isNew }) {
       field(t('Postup'), instructions),
       field(t('Tipy'), tips),
     ]),
-    saveBtn,
   ]));
+  extraEl.append(saveBtn);
   sync();
 }
 
@@ -355,7 +357,7 @@ function pickMuscles(title, selected, taken) {
 }
 
 // ---------- Cvik z katalogu ----------
-async function renderCatalogItem(container, dbId) {
+async function renderCatalogItem(container, dbId, extraEl) {
   const catalog = await loadCatalog().catch(() => []);
   const meta = catalog.find((m) => m.id === dbId);
   if (!meta) { container.append(el('p', { class: 'muted', text: t('Cvik nenalezen.') })); return; }
@@ -384,7 +386,7 @@ async function renderCatalogItem(container, dbId) {
 
   const equipment = EQUIPMENT_FROM_DB[meta.eq] ?? 'other';
   const addBtn = el('button', {
-    type: 'button', class: 'btn btn-primary btn-hero', text: t('Přidat mezi moje cviky'),
+    type: 'button', class: 'btn btn-small btn-primary', text: t('Přidat'),
     onclick: async () => {
       addBtn.disabled = true;
       addBtn.textContent = t('Přidávám…');
@@ -402,7 +404,6 @@ async function renderCatalogItem(container, dbId) {
         el('p', { class: 'muted small', text: [lang === 'en' ? meta.nc : meta.n, EXERCISE_TYPE_LABEL[meta.t], EQUIPMENT_LABEL[equipment]].filter(Boolean).join(' · ') }),
       ]),
     ]),
-    addBtn,
     el('section', { class: 'card' }, [
       el('h3', { class: 'card-title', text: t('Partie') }),
       el('dl', { class: 'kv' }, [
@@ -411,6 +412,7 @@ async function renderCatalogItem(container, dbId) {
       ]),
     ]),
   );
+  extraEl.append(addBtn);
   const instructions = await dbInstructions(dbId);
   if (instructions) stack.append(el('section', { class: 'card' }, [el('h3', { class: 'card-title', text: t('Postup') }), el('p', { class: 'prose', text: instructions })]));
 }

@@ -449,4 +449,5 @@ export const EN = {
   'nic': 'nothing',
   'akorát': 'just right',
   'přejedený': 'overate',
+  '← Trénink': '← Workout',
 };
