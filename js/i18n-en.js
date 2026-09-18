@@ -474,4 +474,12 @@ export const EN = {
   'Tréninků': 'Workouts',
   'Hodin': 'Hours',
   'V tomto období žádný trénink.': 'No workouts in this period.',
+  'Jak začít': 'Getting started',
+  'Vytvoř si typ tréninku (např. Záda a biceps, Nohy…).': 'Create a workout type (e.g. Back & biceps, Legs…).',
+  'Přidej do něj cviky z katalogu a nastav série, váhy a pauzy.': 'Add exercises from the catalogue and set sets, weights and rest.',
+  'Klepni na Nový trénink a cvič. Appka si pamatuje výkony a doporučí další zátěž.': 'Tap New workout and train. The app remembers your performance and suggests the next load.',
+  'Vytvořit typ tréninku': 'Create workout type',
+  'Data zůstávají jen v tomto telefonu. Appku si přidej na plochu přes Sdílet → Přidat na plochu.': 'Your data stays on this phone only. Add the app to your home screen via Share → Add to Home Screen.',
+  'např. Záda a biceps': 'e.g. Back & biceps',
+  'Zatím žádné. Klepni na cvik v katalogu níže a přidej ho.': 'None yet. Tap an exercise in the catalogue below to add it.',
 };

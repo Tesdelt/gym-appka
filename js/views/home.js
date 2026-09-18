@@ -1,5 +1,5 @@
-import { el, openDialog, toast, dateShort, plural } from '../ui.js';
-import { listTemplates, listGyms, getLastGymId, colorAttrs } from '../data.js';
+import { el, openDialog, toast, dateShort, plural, promptText } from '../ui.js';
+import { listTemplates, listGyms, getLastGymId, colorAttrs, addTemplate } from '../data.js';
 import { getActiveWorkout, startWorkout, listDoneWorkouts } from '../workout.js';
 import { navigate } from '../router.js';
 import { t, locale } from '../i18n.js';
@@ -26,6 +26,7 @@ export async function render(container) {
 
   container.append(el('div', { class: 'stack' }, [
     hero,
+    !templates.length && !done.length ? welcomeCard() : null,
     remind ? backupBanner(remind) : null,
     el('section', {}, [
       el('h2', { class: 'section-title', text: t('Historie') }),
@@ -47,6 +48,7 @@ export async function render(container) {
 async function onNewWorkout() {
   const [templates, gyms, lastGymId] = await Promise.all([listTemplates(), listGyms(), getLastGymId()]);
   if (!gyms.length) { toast(t('Nejdřív přidej posilovnu v Nastavení')); return; }
+  if (!templates.length) { await createFirstTemplate(); return; }
 
   const choice = await openDialog((close) => {
     let templateId = templates[0]?.id ?? null;
@@ -112,4 +114,26 @@ function backupBanner(st) {
     ]),
   ]);
   return card;
+}
+
+// Prázdná appka (nový uživatel): krátký návod, jak začít
+function welcomeCard() {
+  const step = (n, text) => el('li', { class: 'welcome-step' }, [el('span', { class: 'prog-dot', text: String(n) }), el('span', { text })]);
+  return el('section', { class: 'card welcome' }, [
+    el('h2', { class: 'card-title', text: t('Jak začít') }),
+    el('ol', { class: 'welcome-steps' }, [
+      step(1, t('Vytvoř si typ tréninku (např. Záda a biceps, Nohy…).')),
+      step(2, t('Přidej do něj cviky z katalogu a nastav série, váhy a pauzy.')),
+      step(3, t('Klepni na Nový trénink a cvič. Appka si pamatuje výkony a doporučí další zátěž.')),
+    ]),
+    el('button', { type: 'button', class: 'btn btn-primary', text: t('Vytvořit typ tréninku'), onclick: createFirstTemplate }),
+    el('p', { class: 'muted small welcome-hint', text: t('Data zůstávají jen v tomto telefonu. Appku si přidej na plochu přes Sdílet → Přidat na plochu.') }),
+  ]);
+}
+
+async function createFirstTemplate() {
+  const name = await promptText({ title: t('Nový typ tréninku'), placeholder: t('např. Záda a biceps'), okLabel: t('Vytvořit') });
+  if (!name) return;
+  const tpl = await addTemplate(name);
+  navigate(`sablona/${encodeURIComponent(tpl.id)}`);
 }

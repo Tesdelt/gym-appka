@@ -2,7 +2,6 @@
 // Vloží se jen jednou, při prvním spuštění (meta.seeded).
 
 import { count, putAll, setMeta, getMeta } from './db.js';
-import { BUILTIN_IMAGES } from './builtinImages.js';
 
 export const DEFAULT_WEIGHT_STEP = 2.5;
 
@@ -269,17 +268,14 @@ export async function seedIfEmpty() {
   if ((await count('gyms')) === 0) {
     await putAll('gyms', [{ ...DEFAULT_GYM, createdAt: now }]);
   }
-  if ((await count('exercises')) === 0) {
-    await putAll('exercises', BUILTIN_EXERCISES.map((e) => ({
-      ...e, nameEn: BUILTIN_EN[e.id]?.name, instructionsEn: BUILTIN_EN[e.id]?.instructions, tipsEn: BUILTIN_EN[e.id]?.tips,
-      images: BUILTIN_IMAGES[e.id] ?? [], photoId: null, gymSteps: {}, source: 'builtin', createdAt: now,
-    })));
-  }
-  if ((await count('templates')) === 0) {
-    await putAll('templates', BUILTIN_TEMPLATES.map((t) => ({ ...t, createdAt: now })));
-  }
+  // Nový uživatel začíná s prázdnou appkou: žádné cviky ani typy tréninků,
+  // vše si přidá z katalogu. (BUILTIN_EXERCISES a BUILTIN_TEMPLATES zůstávají
+  // kvůli převodům dat u prvních uživatelů, kterým se kdysi předvyplnily.)
   await setMeta('seeded', now);
   await setMeta('exDataV2', now);
+  await setMeta('restRuleV1', now);
+  await setMeta('cableCurlV1', now);
+  await setMeta('dbCzech', now);
   await setMeta('lastGymId', DEFAULT_GYM.id);
   return true;
 }

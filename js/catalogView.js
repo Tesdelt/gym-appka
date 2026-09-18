@@ -63,7 +63,7 @@ export async function mountCatalog(host, { scrollRoot, onMine, onDb, onInfo = nu
       el('h2', { class: 'section-title', text: t('Moje cviky') }),
       myList.length
         ? el('div', { class: 'cat-grid' }, myList.map((e) => card(exName(e), imageBox(e, { cls: 'cat-pic' }), () => onMine(e))))
-        : el('p', { class: 'muted small', text: t('Žádný z mých cviků neodpovídá.') }),
+        : el('p', { class: 'muted small', text: mine.length ? t('Žádný z mých cviků neodpovídá.') : t('Zatím žádné. Klepni na cvik v katalogu níže a přidej ho.') }),
     );
 
     if (!showCatalog) { dbSection.replaceChildren(); return; }
