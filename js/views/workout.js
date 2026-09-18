@@ -62,6 +62,7 @@ export async function render(container, { extraEl, titleEl }) {
     draw: () => {
       container.replaceChildren(...screen(workout, ctx), ...(workout.exercises.length ? [ctx.progress.root] : []));
       ctx.progress.update(workout);
+      fitToScreen(container);
     },
     // karta odjede, změní se pozice a nová přijede z druhé strany
     move: async (dir, mutate) => {
@@ -81,6 +82,20 @@ export async function render(container, { extraEl, titleEl }) {
   );
 
   ctx.draw();
+  const onResize = () => { if (container.isConnected) fitToScreen(container); else window.removeEventListener('resize', onResize); };
+  window.addEventListener('resize', onResize);
+}
+
+// Obrazovka tréninku se nesmí scrollovat. Když se obsah nevejde (menší
+// iPhone), přepne se na kompaktní a případně ještě úspornější rozložení.
+function fitToScreen(container) {
+  const overflows = () => container.scrollHeight > container.clientHeight + 1
+    || [...container.children].some((c) => c.scrollHeight > c.clientHeight + 1);
+  container.classList.remove('is-compact', 'is-tight');
+  if (!overflows()) return;
+  container.classList.add('is-compact');
+  if (!overflows()) return;
+  container.classList.add('is-tight');
 }
 
 async function endWorkout(workout, ctx) {

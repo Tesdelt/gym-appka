@@ -1,6 +1,6 @@
 // Export a import všech dat (včetně vlastních fotek) do souboru JSON.
 
-import { openDB, DB_VERSION } from './db.js';
+import { openDB, DB_VERSION, getMeta, setMeta, getAll } from './db.js';
 import { BUILTIN_IMAGES } from './builtinImages.js';
 import { t } from './i18n.js';
 
@@ -48,6 +48,7 @@ export async function shareBackup() {
   if (navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file], title: t('Záloha Gym') });
+      await markBackedUp();
       return 'shared';
     } catch (err) {
       if (err?.name === 'AbortError') return 'cancelled';
@@ -61,6 +62,7 @@ export async function shareBackup() {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
+  await markBackedUp();
   return 'downloaded';
 }
 
@@ -121,4 +123,61 @@ export function pickBackupFile() {
     });
     input.click();
   });
+}
+
+// ---------- Sledování záloh ----------
+async function markBackedUp() {
+  await setMeta('lastBackupAt', new Date().toISOString());
+  await setMeta('backupSnoozeUntil', null);
+}
+
+// Stav zálohy: kdy naposledy, kolik dní a tréninků od té doby
+export async function backupStatus() {
+  const lastAt = await getMeta('lastBackupAt');
+  const done = (await getAll('workouts', 'status', 'done')).length;
+  const since = lastAt
+    ? (await getAll('workouts', 'status', 'done')).filter((w) => (w.endedAt ?? w.startedAt) > lastAt).length
+    : done;
+  const days = lastAt ? Math.floor((Date.now() - new Date(lastAt).getTime()) / 86400000) : null;
+  return { lastAt, days, since, done };
+}
+
+// Připomenout zálohu? Až je co ztratit: nikdy nezálohováno a aspoň 2 tréninky,
+// nebo týden od zálohy s novým tréninkem, nebo 5 tréninků bez zálohy.
+export async function shouldRemindBackup() {
+  const snooze = await getMeta('backupSnoozeUntil');
+  if (snooze && snooze > new Date().toISOString()) return null;
+  const st = await backupStatus();
+  const remind = st.lastAt ? (st.days >= 7 && st.since >= 1) || st.since >= 5 : st.done >= 2;
+  return remind ? st : null;
+}
+
+export async function snoozeBackupReminder(days = 3) {
+  await setMeta('backupSnoozeUntil', new Date(Date.now() + days * 86400000).toISOString());
+}
+
+// ---------- Import historie (sloučení, nic nepřepisuje) ----------
+// Soubor: { app: 'gym-appka', kind: 'history', exercises: [...], workouts: [...] }
+// Přidá tréninky a chybějící cviky; co už v appce je (stejné id), přeskočí.
+export function isHistoryFile(data) {
+  return data?.app === 'gym-appka' && data?.kind === 'history' && Array.isArray(data.workouts);
+}
+
+export async function importHistory(data) {
+  const db = await openDB();
+  const [exIds, wIds] = await Promise.all([
+    getAll('exercises').then((l) => new Set(l.map((e) => e.id))),
+    getAll('workouts').then((l) => new Set(l.map((w) => w.id))),
+  ]);
+  const exercises = (data.exercises ?? []).filter((e) => !exIds.has(e.id));
+  const workouts = data.workouts.filter((w) => !wIds.has(w.id));
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(['exercises', 'workouts'], 'readwrite');
+    exercises.forEach((e) => tx.objectStore('exercises').put(e));
+    workouts.forEach((w) => tx.objectStore('workouts').put(w));
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error ?? new Error('Import zrušen'));
+  });
+  return { exercises: exercises.length, workouts: workouts.length, skipped: data.workouts.length - workouts.length };
 }

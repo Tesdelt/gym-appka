@@ -7,7 +7,7 @@ import { el, promptText, confirmDialog, toast, plural, dragHandle, makeSortable,
 import { navigate } from '../router.js';
 import { renderDiagnostics } from '../diagnostics.js';
 import { getTheme, setTheme } from '../theme.js';
-import { shareBackup, pickBackupFile, inspectBackup, importData } from '../backup.js';
+import { shareBackup, pickBackupFile, inspectBackup, importData, backupStatus, isHistoryFile, importHistory } from '../backup.js';
 import { t, lang, setLang } from '../i18n.js';
 
 export const title = t('Nastavení');
@@ -124,9 +124,17 @@ async function renderGyms(card) {
 }
 
 // ---------- Záloha ----------
-function renderBackup(card) {
+async function renderBackup(card) {
+  const st = await backupStatus();
+  const when = st.lastAt == null ? t('zatím nikdy')
+    : st.days === 0 ? t('dnes') : st.days === 1 ? t('včera') : t('před {n} dny', { n: st.days });
+  const risky = st.lastAt == null ? st.done > 0 : st.days >= 7 && st.since > 0;
   card.replaceChildren(
     el('h2', { class: 'card-title', text: t('Záloha dat') }),
+    el('dl', { class: 'kv backup-status' }, [
+      el('div', { class: 'kv-row' }, [el('dt', { text: t('Poslední záloha') }), el('dd', { class: risky ? 'warn' : '', text: when })]),
+      st.lastAt ? el('div', { class: 'kv-row' }, [el('dt', { text: t('Tréninky od zálohy') }), el('dd', { class: risky ? 'warn' : '', text: String(st.since) })]) : null,
+    ]),
     el('p', { class: 'muted small', text: t('Export uloží všechna data včetně vlastních fotek do souboru. Na iPhonu zvol „Uložit do Souborů“.') }),
     el('div', { class: 'row-2' }, [
       el('button', {
@@ -137,6 +145,7 @@ function renderBackup(card) {
           try {
             const result = await shareBackup();
             if (result === 'downloaded') toast(t('Záloha stažena'));
+            if (result !== 'cancelled') renderBackup(card);
           } catch (err) {
             console.error(err);
             toast(t('Export selhal'));
@@ -151,6 +160,26 @@ function renderBackup(card) {
           const data = await pickBackupFile();
           if (!data) return;
           if (data.error) { toast(data.error); return; }
+          if (isHistoryFile(data)) {
+            // historie z poznámek: jen se přidá, nic se nepřepisuje
+            const ok = await confirmDialog({
+              title: t('Přidat historii tréninků?'),
+              text: t('Soubor obsahuje {workouts}. Přidají se k současným datům, nic se nepřepíše.', {
+                workouts: plural(data.workouts.length, ['trénink', 'tréninky', 'tréninků'], ['workout', 'workouts']),
+              }),
+              okLabel: t('Přidat'),
+            });
+            if (!ok) return;
+            try {
+              const res = await importHistory(data);
+              toast(t('Přidáno: {n}', { n: plural(res.workouts, ['trénink', 'tréninky', 'tréninků'], ['workout', 'workouts']) }));
+              setTimeout(() => { location.hash = '#/domu'; location.reload(); }, 800);
+            } catch (err) {
+              console.error(err);
+              toast(t('Import selhal, data zůstala beze změny'));
+            }
+            return;
+          }
           let info;
           try { info = inspectBackup(data); } catch (err) { toast(err.message); return; }
           const ok = await confirmDialog({

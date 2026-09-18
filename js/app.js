@@ -3,6 +3,7 @@ import { openDB, requestPersistentStorage } from './db.js';
 import { seedIfEmpty, translateDbExercises, upgradeExerciseData, applyRestRule } from './seed.js';
 import { applyTheme } from './theme.js';
 import { transition } from './fx.js';
+import { fillMissingImages } from './catalog.js';
 import { t, lang } from './i18n.js';
 import * as home from './views/home.js';
 import * as stats from './views/stats.js';
@@ -48,6 +49,9 @@ async function init() {
   }
   // Nečekáme na výsledek, jen požádáme (iOS rozhodne samo).
   requestPersistentStorage();
+  // fotky cviků přidaných bez internetu
+  fillMissingImages().catch(() => {});
+  window.addEventListener('online', () => fillMissingImages().catch(() => {}));
 
   const TAB_ORDER = ['statistiky', 'cile', 'domu', 'cviky', 'nastaveni'];
   let prev = null;

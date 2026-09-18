@@ -74,3 +74,27 @@ export async function addFromCatalog(meta) {
   await saveExercise(ex);
   return ex;
 }
+
+// Cviky z katalogu přidané bez internetu nemají fotky. Při spuštění appky
+// a po připojení k internetu se je pokusí dotáhnout.
+let filling = false;
+export async function fillMissingImages() {
+  if (filling || !navigator.onLine) return 0;
+  filling = true;
+  let fixed = 0;
+  try {
+    const { listExercises } = await import('./data.js');
+    const catalog = await loadCatalog().catch(() => []);
+    for (const ex of await listExercises()) {
+      if (ex.source !== 'free-exercise-db' || !ex.dbId || ex.images?.length) continue;
+      const meta = catalog.find((m) => m.id === ex.dbId);
+      try {
+        const images = await downloadDbImages(ex.dbId, meta?.i || 2);
+        if (images.length) { ex.images = images; await saveExercise(ex); fixed++; }
+      } catch { /* zkusí se příště */ }
+    }
+  } finally {
+    filling = false;
+  }
+  return fixed;
+}

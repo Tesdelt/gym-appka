@@ -922,3 +922,51 @@ input[type="date"].input { min-height: var(--tap); line-height: var(--tap); }
 .scale-hints span:first-child { text-align: left; }
 .scale-hints span:last-child { text-align: right; }
 .seg.is-best:not(.is-selected) { box-shadow: inset 0 -2px 0 var(--gold); }
+
+/* ---------- Trénink na menším displeji ---------- */
+.view-workout.is-compact .card-current { padding-top: 6px; padding-bottom: 8px; }
+.view-workout.is-compact .ex-head { margin-bottom: 4px; }
+.view-workout.is-compact .ex-name { font-size: 21px; }
+.view-workout.is-compact .ex-set { font-size: 17px; }
+.view-workout.is-compact .ex-media { margin-bottom: 6px; }
+.view-workout.is-compact .ex-image { width: 62px; }
+.view-workout.is-compact .meta-value { font-size: 14px; }
+.view-workout.is-compact .ex-meta { gap: 3px; }
+.view-workout.is-compact .countdown-btn { width: 100px; height: 100px; }
+.view-workout.is-compact .cd-big { font-size: 36px; }
+.view-workout.is-compact .stepper-label { margin-bottom: 2px; font-size: 12px; }
+.view-workout.is-compact .stepper-btn { min-height: 50px; }
+.view-workout.is-compact .stepper-value { font-size: 26px; }
+.view-workout.is-compact .steppers { margin-bottom: 6px; }
+.view-workout.is-compact .row-2 > .btn, .view-workout.is-compact .rest-info { min-height: 42px; }
+.view-workout.is-compact .rest-btn { min-height: 36px; }
+.view-workout.is-compact .rest-value { font-size: 19px; }
+.view-workout.is-compact .nav-row { margin-top: 6px; }
+.view-workout.is-compact .btn-done, .view-workout.is-compact .btn-back { min-height: 52px; font-size: 21px; }
+.view-workout.is-compact .note-block { margin-top: 6px; }
+.view-workout.is-compact .note-input { min-height: 34px; }
+.view-workout.is-compact .note-next { margin-top: 4px; }
+.view-workout.is-compact .seg { min-height: 34px; }
+.view-workout.is-compact .card-next { padding-top: 5px; padding-bottom: 5px; }
+.view-workout.is-compact .next-name { font-size: 14px; }
+
+/* ještě úspornější: bez obrázku, poznámka a volba na příště v jednom řádku, další cvik na jeden řádek */
+.view-workout.is-tight .ex-image { display: none; }
+.view-workout.is-tight .ex-meta { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 2px 12px; }
+.view-workout.is-tight .ex-meta .btn-skip { order: 3; }
+.view-workout.is-tight .countdown-btn { width: 84px; height: 84px; }
+.view-workout.is-tight .cd-big { font-size: 30px; }
+.view-workout.is-tight .stepper-btn { min-height: 46px; }
+.view-workout.is-tight .btn-done, .view-workout.is-tight .btn-back { min-height: 48px; }
+.view-workout.is-tight .note-block { display: flex; gap: 6px; align-items: center; }
+.view-workout.is-tight .note-input { flex: 1 1 auto; min-width: 0; }
+.view-workout.is-tight .note-next { margin-top: 0; flex: none; }
+.view-workout.is-tight .note-next > .muted { display: none; }
+.view-workout.is-tight .seg { padding: 0 6px; min-width: 0; font-size: 14px; }
+.view-workout.is-tight .card-next > .muted { display: none; }
+.view-workout.is-tight .next-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- Záloha ---------- */
+.backup-banner { border-color: var(--danger); box-shadow: inset 4px 0 0 var(--danger); }
+.backup-banner p { margin: 0 0 10px; }
+.backup-status { margin-bottom: 12px; }
