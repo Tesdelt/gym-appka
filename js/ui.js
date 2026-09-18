@@ -91,6 +91,30 @@ export function promptNumber({ title, value = 0, step = 'any', min = null, unit 
   });
 }
 
+// Číselné pole s tlačítky +/− a možností ručního zadání (čárka i tečka).
+// Vrací { root, input, value() }.
+export function stepField(label, value, step, min = null) {
+  const fmt = (v) => (v == null || !Number.isFinite(v) ? '' : new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2, useGrouping: false }).format(v));
+  const read = () => parseFloat(String(input.value).replace(',', '.').replace(/\s/g, ''));
+  const input = el('input', { type: 'text', class: 'input edit-field', inputmode: 'decimal', value: fmt(value), autocomplete: 'off' });
+  const bump = (d) => {
+    let v = read();
+    if (!Number.isFinite(v)) v = 0;
+    v = Math.round((v + d) * 100) / 100;
+    if (min != null && v < min) v = min;
+    input.value = fmt(v);
+  };
+  const root = el('div', { class: 'edit-row' }, [
+    el('span', { class: 'field-label', text: label }),
+    el('div', { class: 'stepper-row edit-stepper' }, [
+      el('button', { type: 'button', class: 'btn stepper-btn', text: '−', 'aria-label': `${label} minus`, onclick: () => bump(-step) }),
+      input,
+      el('button', { type: 'button', class: 'btn stepper-btn', text: '+', 'aria-label': `${label} plus`, onclick: () => bump(step) }),
+    ]),
+  ]);
+  return { root, input, value: read, set: (v) => { input.value = fmt(v); } };
+}
+
 // Skloňování: plural(4, ['cvik', 'cviky', 'cviků']) → „4 cviky“
 export function plural(n, forms) {
   const abs = Math.abs(n);

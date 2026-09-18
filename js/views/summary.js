@@ -1,7 +1,7 @@
 // Souhrn tréninku: při ukončení (škály, komentář, uložení) i jako detail
 // uloženého tréninku z historie.
 
-import { el, toast, confirmDialog, openDialog, promptText, formatValues, dateLong, timeShort } from '../ui.js';
+import { el, toast, confirmDialog, openDialog, promptText, stepField, formatValues, dateLong, timeShort } from '../ui.js';
 import { navigate } from '../router.js';
 import { slotsOf } from '../recommend.js';
 import { findNewRecords } from '../records.js';
@@ -240,27 +240,7 @@ function kv(label, value) {
 // a přepínač, zda byla odcvičená.
 function editSlot(entry, slot) {
   return openDialog((close) => {
-    const fmt = (v) => (v == null ? '' : new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2, useGrouping: false }).format(v));
-    const parse = (input) => parseFloat(String(input.value).replace(',', '.'));
-    const field = (label, value, step, min) => {
-      const input = el('input', { type: 'text', class: 'input edit-field', inputmode: 'decimal', value: fmt(value), autocomplete: 'off' });
-      const bump = (d) => {
-        let v = parse(input);
-        if (!Number.isFinite(v)) v = 0;
-        v = Math.round((v + d) * 100) / 100;
-        if (min != null && v < min) v = min;
-        input.value = fmt(v);
-      };
-      const root = el('div', { class: 'edit-row' }, [
-        el('span', { class: 'field-label', text: label }),
-        el('div', { class: 'stepper-row edit-stepper' }, [
-          el('button', { type: 'button', class: 'btn stepper-btn', text: '−', onclick: () => bump(-step) }),
-          input,
-          el('button', { type: 'button', class: 'btn stepper-btn', text: '+', onclick: () => bump(step) }),
-        ]),
-      ]);
-      return { root, input };
-    };
+    const field = stepField;
     const weight = entry.type === 'reps' ? null : field(entry.bodyweight ? 'Přidaná váha (kg)' : 'Váha (kg)', slot.weight, entry.weightStep ?? 2.5, entry.bodyweight ? null : 0);
     const reps = entry.type === 'time' ? null : field('Opakování', slot.reps, 1, 0);
     const seconds = entry.type === 'time' ? field('Výdrž (s)', slot.seconds, 5, 0) : null;
@@ -280,9 +260,9 @@ function editSlot(entry, slot) {
     ]);
     form.addEventListener('submit', (e) => {
       e.preventDefault();
-      if (weight) { const v = parse(weight.input); if (Number.isFinite(v)) slot.weight = Math.round(v * 100) / 100; }
-      if (reps) { const v = parse(reps.input); if (Number.isFinite(v)) slot.reps = Math.round(v); }
-      if (seconds) { const v = parse(seconds.input); if (Number.isFinite(v)) slot.seconds = Math.round(v); }
+      if (weight) { const v = weight.value(); if (Number.isFinite(v)) slot.weight = Math.round(v * 100) / 100; }
+      if (reps) { const v = reps.value(); if (Number.isFinite(v)) slot.reps = Math.round(v); }
+      if (seconds) { const v = seconds.value(); if (Number.isFinite(v)) slot.seconds = Math.round(v); }
       if (done !== slot.done) { slot.done = done; slot.doneAt = done ? new Date().toISOString() : null; }
       close(true);
     });

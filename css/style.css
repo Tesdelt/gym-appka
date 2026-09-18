@@ -578,3 +578,5 @@ input[type="date"].input { min-height: var(--tap); line-height: var(--tap); }
 .chart-bar.is-current { fill: #C23447; }
 .chart-dot.is-manual { fill: var(--surface); stroke-dasharray: 2 2; }
 .chart-dot.is-manual.is-gold { fill: var(--surface); stroke: var(--gold); }
+
+.input-static { display: flex; align-items: center; color: var(--text-2); background: transparent; }

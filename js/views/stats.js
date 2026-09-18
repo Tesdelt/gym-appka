@@ -4,7 +4,7 @@
 //        #/statistiky/mira/<key>    tělesná míra: graf, záznamy
 //        #/statistiky/cvik/<id>     výkon cviku: graf, rekordy, ruční záznamy
 
-import { el, openDialog, confirmDialog, toast, formatWeight, formatValues, dateShort, plural } from '../ui.js';
+import { el, openDialog, confirmDialog, toast, stepField, formatWeight, formatValues, dateShort, plural } from '../ui.js';
 import { navigate } from '../router.js';
 import {
   listMeasureKinds, saveMeasureKinds, listMeasurements, addMeasurement, deleteMeasurement,
@@ -235,7 +235,6 @@ const PRESET_KINDS = [
   { key: 'tuk', name: 'Tělesný tuk', unit: '%' },
   { key: 'svaly', name: 'Svalová hmota', unit: 'kg' },
 ];
-const UNITS = ['cm', 'kg', '%'];
 
 function newKindDialog(kinds) {
   const available = PRESET_KINDS.filter((p) => !kinds.some((k) => k.key === p.key));
@@ -247,12 +246,11 @@ function newKindDialog(kinds) {
         el('div', { class: 'dialog-actions' }, [el('button', { type: 'button', class: 'btn btn-primary', text: 'OK', onclick: () => close(false) })]),
       ]);
     }
-    const unit = el('select', { class: 'input' }, UNITS.map((u) => el('option', { value: u, text: u })));
+    const unit = el('div', { class: 'input input-static', text: available[0].unit });
     const name = el('select', {
       class: 'input',
-      onchange: () => { unit.value = available.find((p) => p.key === name.value).unit; },
+      onchange: () => { unit.textContent = available.find((p) => p.key === name.value).unit; },
     }, available.map((p) => el('option', { value: p.key, text: p.name })));
-    unit.value = available[0].unit;
     const form = el('form', { method: 'dialog', class: 'dialog-body stack-tight' }, [
       el('h2', { class: 'dialog-title', text: 'Nová míra' }),
       el('label', { class: 'field' }, [el('span', { class: 'field-label', text: 'Míra' }), name]),
@@ -265,7 +263,7 @@ function newKindDialog(kinds) {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const preset = available.find((p) => p.key === name.value);
-      await saveMeasureKinds([...kinds, { key: preset.key, name: preset.name, unit: unit.value }]);
+      await saveMeasureKinds([...kinds, { key: preset.key, name: preset.name, unit: preset.unit }]);
       close(true);
     });
     return form;
@@ -340,37 +338,56 @@ async function renderExercise(container, id, titleEl) {
   draw();
 }
 
-function manualRecordDialog(exercise, gyms, presetGymId) {
+// Ruční záznam výkonu. Hodnoty se předvyplní z dosavadního rekordu.
+async function manualRecordDialog(exercise, gyms, presetGymId) {
+  const [done, manualAll, exercises] = await Promise.all([listDoneWorkouts(), listManualRecords(), exerciseMap()]);
+  const records = computeRecords([...done, ...manualAsWorkouts(manualAll.filter((m) => m.exerciseId === exercise.id), exercises)]);
+  const recFor = (gymId) => records.get(recordKey({ exerciseId: exercise.id, perGym: exercise.perGym }, gymId));
+
   return openDialog((close) => {
     let gymId = exercise.perGym ? (presetGymId ?? gyms[0]?.id) : null;
-    const input = (placeholder) => el('input', { type: 'text', class: 'input', inputmode: 'decimal', autocomplete: 'off', placeholder });
-    const weight = exercise.type === 'reps' ? null : input(exercise.bodyweight ? 'přidaná, 0 = tělo' : 'kg');
-    const reps = exercise.type === 'time' ? null : input('opakování');
-    const seconds = exercise.type === 'time' ? input('sekundy') : null;
+    const step = exercise.weightStep ?? 2.5;
+    const weight = exercise.type === 'reps' ? null : stepField(exercise.bodyweight ? 'Přidaná váha (kg)' : 'Váha (kg)', 0, step, exercise.bodyweight ? null : 0);
+    const reps = exercise.type === 'time' ? null : stepField('Opakování', 1, 1, 1);
+    const seconds = exercise.type === 'time' ? stepField('Výdrž (s)', 30, 5, 0) : null;
+    const info = el('p', { class: 'muted small' });
+    const prefill = () => {
+      const rec = recFor(gymId);
+      if (exercise.type === 'time') {
+        seconds.set(rec?.maxSeconds?.value ?? 30);
+        if (weight) weight.set(rec?.maxSeconds?.weight ?? 0);
+      } else if (exercise.type === 'reps') {
+        reps.set(rec?.maxReps?.value ?? 10);
+      } else {
+        const w = rec?.maxWeight?.value ?? 0;
+        weight.set(w);
+        reps.set(rec?.repsAtWeight.get(w)?.value ?? rec?.maxWeight?.reps ?? 1);
+      }
+      info.textContent = rec && recordText(exercise, rec) !== '–' ? `Dosavadní rekord: ${recordText(exercise, rec)}` : 'Zatím bez rekordu.';
+    };
     const date = el('input', { type: 'date', class: 'input', value: today(), max: today() });
     const gymSelect = exercise.perGym && gyms.length > 1
-      ? el('select', { class: 'input', onchange: (e) => { gymId = e.target.value; } }, gyms.map((g) => el('option', { value: g.id, text: g.name, selected: g.id === gymId ? '' : null })))
+      ? el('select', { class: 'input', onchange: (e) => { gymId = e.target.value; prefill(); } }, gyms.map((g) => el('option', { value: g.id, text: g.name, selected: g.id === gymId ? '' : null })))
       : null;
-    const field = (label, control) => el('label', { class: 'field' }, [el('span', { class: 'field-label', text: label }), control]);
     const form = el('form', { method: 'dialog', class: 'dialog-body stack-tight' }, [
       el('h2', { class: 'dialog-title', text: exercise.name }),
-      gymSelect ? field('Posilovna', gymSelect) : null,
-      weight ? field(exercise.bodyweight ? 'Přidaná váha (kg)' : 'Váha (kg)', weight) : null,
-      reps ? field('Opakování', reps) : null,
-      seconds ? field('Výdrž (s)', seconds) : null,
-      field('Datum', date),
+      gymSelect ? el('label', { class: 'field' }, [el('span', { class: 'field-label', text: 'Posilovna' }), gymSelect]) : null,
+      info,
+      weight?.root, reps?.root, seconds?.root,
+      el('label', { class: 'field' }, [el('span', { class: 'field-label', text: 'Datum' }), date]),
       el('div', { class: 'dialog-actions' }, [
         el('button', { type: 'button', class: 'btn', text: 'Zrušit', onclick: () => close(false) }),
         el('button', { type: 'submit', class: 'btn btn-primary', text: 'Uložit' }),
       ]),
     ]);
+    prefill();
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const w = weight ? parse(weight) : 0;
-      const r = reps ? Math.round(parse(reps)) : null;
-      const s = seconds ? Math.round(parse(seconds)) : null;
-      if ((weight && !Number.isFinite(w)) || (reps && !(r > 0)) || (seconds && !(s > 0))) { toast('Vyplň hodnoty'); return; }
-      await addManualRecord({ exerciseId: exercise.id, gymId, weight: w, reps: r, seconds: s, date: toIso(date.value) });
+      const w = weight ? weight.value() : 0;
+      const r = reps ? Math.round(reps.value()) : null;
+      const sec = seconds ? Math.round(seconds.value()) : null;
+      if ((weight && !Number.isFinite(w)) || (reps && !(r > 0)) || (seconds && !(sec > 0))) { toast('Vyplň hodnoty'); return; }
+      await addManualRecord({ exerciseId: exercise.id, gymId, weight: w, reps: r, seconds: sec, date: toIso(date.value) });
       toast('Záznam uložen');
       close(true);
     });
