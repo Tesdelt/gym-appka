@@ -1,6 +1,6 @@
 import { addRoute, startRouter } from './router.js';
 import { openDB, requestPersistentStorage } from './db.js';
-import { seedIfEmpty } from './seed.js';
+import { seedIfEmpty, translateDbExercises } from './seed.js';
 import { applyTheme } from './theme.js';
 import { transition } from './fx.js';
 import * as home from './views/home.js';
@@ -43,6 +43,7 @@ async function init() {
   }
   // Nečekáme na výsledek, jen požádáme (iOS rozhodne samo).
   requestPersistentStorage();
+  translateDbExercises().catch((err) => console.error(err));
 
   const TAB_ORDER = ['statistiky', 'cile', 'domu', 'cviky', 'nastaveni'];
   let prev = null;

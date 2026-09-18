@@ -17,7 +17,7 @@ import { computeRecords, recordKey } from '../records.js';
 import { rangeChart } from '../chart.js';
 import { listManualRecords, manualAsWorkouts, exercisePoints, exerciseFormat, exerciseChartTitle } from '../stats.js';
 import {
-  imageBox, pickPhoto, deleteImage, fetchDbExercise, downloadDbImages, loadDbIndex, MUSCLE_CS, EQUIPMENT_FROM_DB,
+  imageBox, pickPhoto, deleteImage, fetchDbExercise, downloadDbImages, loadDbIndex, czechInstructions, MUSCLE_CS, EQUIPMENT_FROM_DB,
 } from '../images.js';
 import { DEFAULT_WEIGHT_STEP } from '../seed.js';
 
@@ -211,7 +211,7 @@ async function draftFromDb(dbId) {
   const equipment = EQUIPMENT_FROM_DB[meta.eq] ?? 'other';
   const draft = {
     ...emptyDraft(),
-    name: meta.n,
+    name: meta.nc ?? meta.n,
     aliases: [meta.n],
     bodyweight: meta.eq === 'body only',
     equipment,
@@ -220,11 +220,14 @@ async function draftFromDb(dbId) {
     source: 'free-exercise-db',
     dbId,
   };
-  try {
-    const full = await fetchDbExercise(dbId);
-    draft.instructions = (full.instructions ?? []).join(' ');
-  } catch {
-    // bez internetu: postup zůstane prázdný
+  draft.instructions = await czechInstructions(dbId);
+  if (!draft.instructions) {
+    try {
+      const full = await fetchDbExercise(dbId);
+      draft.instructions = (full.instructions ?? []).join('\n');
+    } catch {
+      draft.instructions = ''; // bez internetu zůstane prázdný
+    }
   }
   return draft;
 }
@@ -327,7 +330,7 @@ async function renderForm(container, draft, { isNew, dbId = null }) {
   });
 
   container.append(el('div', { class: 'stack form' }, [
-    dbId ? el('p', { class: 'muted small', text: 'Cvik z databáze free-exercise-db. Doplň český název a případně přelož postup. Obrázky se stáhnou při uložení.' }) : null,
+    dbId ? el('p', { class: 'muted small', text: 'Cvik z databáze free-exercise-db, přeložený do češtiny. Název i postup můžeš upravit. Obrázky se stáhnou při uložení.' }) : null,
     el('section', { class: 'card stack' }, [
       field('Název', name),
       field('Přezdívky', aliases, 'Oddělené čárkou. Podle nich cvik najdeš ve vyhledávání.'),

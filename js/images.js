@@ -135,7 +135,22 @@ export function loadDbIndex() {
   return indexPromise;
 }
 
-// Podrobnosti cviku z databáze (postup) – vyžaduje internet
+// České postupy všech cviků databáze (uložené v appce, fungují offline)
+let csPromise = null;
+export function loadDbCzech() {
+  if (!csPromise) {
+    csPromise = fetch('data/free-exercise-db-cs.json').then((r) => (r.ok ? r.json() : {})).catch(() => { csPromise = null; return {}; });
+  }
+  return csPromise;
+}
+
+// Český postup jako text: každý krok na samostatném řádku
+export async function czechInstructions(dbId) {
+  const steps = (await loadDbCzech())[dbId];
+  return steps?.length ? steps.join('\n') : null;
+}
+
+// Podrobnosti cviku z databáze (anglický originál) – vyžaduje internet
 export async function fetchDbExercise(dbId) {
   const r = await fetch(`${FEDB_BASE}${encodeURIComponent(dbId)}.json`);
   if (!r.ok) throw new Error('Cvik se nepodařilo stáhnout');

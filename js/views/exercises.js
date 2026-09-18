@@ -59,7 +59,7 @@ async function addExercise() {
       ]),
       el('button', { type: 'button', class: 'choice', onclick: () => close('db') }, [
         el('span', { class: 'choice-title', text: 'Z databáze' }),
-        el('span', { class: 'muted small', text: 'Přes 800 cviků s obrázky (anglicky). Při přidání je potřeba internet.' }),
+        el('span', { class: 'muted small', text: 'Přes 800 cviků s obrázky a českým postupem. Obrázky se stahují, je potřeba internet.' }),
       ]),
     ]),
     el('div', { class: 'dialog-actions' }, [el('button', { type: 'button', class: 'btn', text: 'Zrušit', onclick: () => close(null) })]),
@@ -90,7 +90,7 @@ async function pickFromDb() {
   }
   return openDialog((close) => {
     const list = el('ul', { class: 'list picker-list' });
-    const hay = index.map((e) => normalize([e.n, ...e.p, ...e.s, ...e.p.map((m) => MUSCLE_CS[m] ?? ''), EQUIPMENT_DB_CS[e.eq] ?? ''].join(' ')));
+    const hay = index.map((e) => normalize([e.nc ?? '', e.n, ...e.p, ...e.s, ...e.p.map((m) => MUSCLE_CS[m] ?? ''), EQUIPMENT_DB_CS[e.eq] ?? ''].join(' ')));
     const draw = (query) => {
       const words = normalize(query).trim().split(/\s+/).filter(Boolean);
       const found = [];
@@ -99,8 +99,8 @@ async function pickFromDb() {
       }
       list.replaceChildren(...found.map((e) => el('li', { class: 'list-row' }, [
         el('button', { type: 'button', class: 'list-main', onclick: () => close(e.id) }, [
-          el('span', { class: 'block', text: e.n }),
-          el('span', { class: 'muted small block', text: [e.p.map((m) => MUSCLE_CS[m] ?? m).join(', '), EQUIPMENT_DB_CS[e.eq]].filter(Boolean).join(' · ') }),
+          el('span', { class: 'block', text: e.nc ?? e.n }),
+          el('span', { class: 'muted small block', text: [e.nc ? e.n : null, e.p.map((m) => MUSCLE_CS[m] ?? m).join(', '), EQUIPMENT_DB_CS[e.eq]].filter(Boolean).join(' · ') }),
         ]),
       ])));
       if (!found.length) list.append(el('li', { class: 'muted small', text: 'Nic nenalezeno.' }));
@@ -108,7 +108,7 @@ async function pickFromDb() {
     draw('');
     return el('div', { class: 'dialog-body' }, [
       el('h2', { class: 'dialog-title', text: 'Cvik z databáze' }),
-      el('input', { type: 'search', class: 'input', placeholder: 'Hledat (anglicky, nebo partie česky)…', autocomplete: 'off', oninput: (e) => draw(e.target.value) }),
+      el('input', { type: 'search', class: 'input', placeholder: 'Hledat česky nebo anglicky, i podle partie…', autocomplete: 'off', oninput: (e) => draw(e.target.value) }),
       list,
       el('div', { class: 'dialog-actions' }, [el('button', { type: 'button', class: 'btn', text: 'Zrušit', onclick: () => close(null) })]),
     ]);

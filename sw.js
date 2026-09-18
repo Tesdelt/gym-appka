@@ -1,6 +1,6 @@
 // Service worker: offline cache. Při každém nasazení zvýšit VERSION
 // a nové soubory doplnit do ASSETS.
-const VERSION = '0.9.7';
+const VERSION = '0.9.8';
 const CACHE = `gym-app-v${VERSION}`;
 
 const ASSETS = [
@@ -29,6 +29,7 @@ const ASSETS = [
   'js/backup.js',
   'js/fx.js',
   'data/free-exercise-db.json',
+  'data/free-exercise-db-cs.json',
   'js/views/home.js',
   'js/views/stats.js',
   'js/views/goals.js',

@@ -186,6 +186,25 @@ export const BUILTIN_TEMPLATES = [
 
 export const DEFAULT_GYM = { id: 'hlavni', name: 'Hlavní posilovna' };
 
+// Cviky přidané z databáze dřív (s anglickým postupem) dostanou český postup
+// a český název, pokud si ho uživatel nezměnil.
+export async function translateDbExercises() {
+  if (await getMeta('dbCzech')) return;
+  const [{ loadDbCzech, loadDbIndex }, { getAll }, { saveExercise }] = await Promise.all([import('./images.js'), import('./db.js'), import('./data.js')]);
+  const [cs, index] = await Promise.all([loadDbCzech(), loadDbIndex().catch(() => [])]);
+  if (!Object.keys(cs).length) return; // soubor zatím nedostupný, zkusí se příště
+  const looksEnglish = (t) => /\b(the|your|and|with|until|slowly)\b/i.test(t ?? '');
+  for (const ex of await getAll('exercises')) {
+    if (ex.source !== 'free-exercise-db' || !ex.dbId || !cs[ex.dbId]) continue;
+    let changed = false;
+    if (!ex.instructions || looksEnglish(ex.instructions)) { ex.instructions = cs[ex.dbId].join('\n'); changed = true; }
+    const meta = index.find((e) => e.id === ex.dbId);
+    if (meta?.nc && ex.name === meta.n) { ex.name = meta.nc; changed = true; }
+    if (changed) await saveExercise(ex); // přejmenování se propíše i do historie
+  }
+  await setMeta('dbCzech', new Date().toISOString());
+}
+
 export async function seedIfEmpty() {
   if (await getMeta('seeded')) return false;
   const now = new Date().toISOString();
