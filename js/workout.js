@@ -101,7 +101,7 @@ export function buildEntry(item, exercise, gymId, doneWorkouts) {
     weightStep: item.weightStep ?? weightStepFor(exercise, gymId),
     mode: item.mode,
     note: '',
-    next: null,
+    next: 'keep',
     rec: [],
     last: null,
   };
@@ -119,6 +119,9 @@ export function buildEntry(item, exercise, gymId, doneWorkouts) {
       }
     }
     entry.rec = recommendDropset(entry, last?.entry ?? null);
+    if (isExplicitChoice(last)) {
+      for (const round of entry.rounds) round.steps.forEach((slot, i) => applyValues(slot, entry.rec[i]));
+    }
   } else {
     entry.sets = item.sets.map((s) => slotFrom(s, rangeFor(s, item), s.rest, exercise));
     if (last) {
@@ -126,6 +129,7 @@ export function buildEntry(item, exercise, gymId, doneWorkouts) {
       entry.sets.forEach((slot, i) => prefill(slot, lastDone[Math.min(i, lastDone.length - 1)]));
     }
     entry.rec = recommendSets(entry, last?.entry ?? null);
+    if (isExplicitChoice(last)) entry.sets.forEach((slot, i) => applyValues(slot, entry.rec[i]));
   }
 
   if (last) {
@@ -136,6 +140,20 @@ export function buildEntry(item, exercise, gymId, doneWorkouts) {
     };
   }
   return entry;
+}
+
+// Volba „Přidat“ / „Snížit“ z minula se provede rovnou: hodnoty se předvyplní
+// už posunuté (a stanou se plánem série).
+function isExplicitChoice(last) {
+  return last?.entry.next === 'more' || last?.entry.next === 'less';
+}
+
+function applyValues(slot, values) {
+  if (!values) return;
+  if (values.weight != null) slot.weight = values.weight;
+  if (values.reps != null) slot.reps = values.reps;
+  if (values.seconds != null) slot.seconds = values.seconds;
+  slot.plan = { weight: slot.weight, reps: slot.reps, seconds: slot.seconds };
 }
 
 function prefill(slot, ref) {
@@ -223,13 +241,45 @@ export function firstUndoneIn(entry) {
   return i === -1 ? 0 : i;
 }
 
-// Potvrzení série: označí hotovo a posune kurzor.
+// Následující pozice v pořadí (bez ohledu na hotovo), nebo null na konci.
+export function nextInOrder(workout, from) {
+  if (!from) return null;
+  const slots = slotsOf(workout.exercises[from.ex]);
+  if (from.slot + 1 < slots.length) return { ex: from.ex, slot: from.slot + 1 };
+  if (from.ex + 1 < workout.exercises.length) return { ex: from.ex + 1, slot: 0 };
+  return null;
+}
+
+// Předchozí pozice v pořadí, nebo null na začátku.
+export function prevInOrder(workout, from) {
+  if (!from) return null;
+  if (from.slot > 0) return { ex: from.ex, slot: from.slot - 1 };
+  if (from.ex > 0) {
+    const ex = from.ex - 1;
+    return { ex, slot: slotsOf(workout.exercises[ex]).length - 1 };
+  }
+  return null;
+}
+
+// Kam se přejde po potvrzení aktuální série (ještě před jejím označením).
+export function positionAfterConfirm(workout) {
+  const cur = currentSlot(workout);
+  if (!cur) return null;
+  if (cur.slot.done) return nextInOrder(workout, workout.cursor);
+  return nextUndone(workout, workout.cursor);
+}
+
+// Potvrzení série: označí hotovo a posune kurzor. U už hotové série jen
+// uloží změnu a jde na další v pořadí.
 export function completeCurrent(workout) {
   const cur = currentSlot(workout);
   if (!cur) return;
-  cur.slot.done = true;
-  cur.slot.doneAt = new Date().toISOString();
-  workout.cursor = nextUndone(workout, workout.cursor);
+  const target = positionAfterConfirm(workout);
+  if (!cur.slot.done) {
+    cur.slot.done = true;
+    cur.slot.doneAt = new Date().toISOString();
+  }
+  workout.cursor = target ?? nextUndone(workout, workout.cursor);
 }
 
 // Zbývající sekundy do konce tréninku nejsou, jen celková délka.

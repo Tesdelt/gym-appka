@@ -1,7 +1,7 @@
 // Souhrn tréninku: při ukončení (škály, komentář, uložení) i jako detail
 // uloženého tréninku z historie.
 
-import { el, toast, confirmDialog, formatValues, dateLong, timeShort } from '../ui.js';
+import { el, toast, confirmDialog, openDialog, promptText, formatValues, dateLong, timeShort } from '../ui.js';
 import { navigate } from '../router.js';
 import { slotsOf } from '../recommend.js';
 import { findNewRecords } from '../records.js';
@@ -17,6 +17,15 @@ const SCALES = [['energy', 'Energie'], ['sleep', 'Spánek'], ['food', 'Jídlo']]
 export async function render(container, { params }) {
   const id = params[0];
   const workout = id ? await getWorkout(id) : await getActiveWorkout();
+  const state = { editing: false };
+  const draw = async () => {
+    container.replaceChildren();
+    await drawSummary(container, workout, id, state, draw);
+  };
+  await draw();
+}
+
+async function drawSummary(container, workout, id, state, redraw) {
   if (!workout) {
     container.append(el('section', { class: 'card' }, [
       el('h2', { class: 'card-title', text: id ? 'Trénink nenalezen' : 'Žádný rozdělaný trénink' }),
@@ -24,7 +33,7 @@ export async function render(container, { params }) {
     ]));
     return;
   }
-  const editable = workout.status === 'active';
+  const editable = workout.status === 'active' || state.editing;
   const done = await listDoneWorkouts();
   const previousAll = done.filter((w) => w.id !== workout.id && w.startedAt < workout.startedAt);
   const previousSame = previousAll.find((w) => w.templateId === workout.templateId) ?? null;
@@ -85,14 +94,31 @@ export async function render(container, { params }) {
       const doneSlots = slots.map((s, i) => [s, i]).filter(([s]) => s.done);
       return el('div', { class: 'sum-ex' }, [
         el('strong', { class: 'block', text: entry.name }),
-        doneSlots.length
-          ? el('ul', { class: 'plain-list sum-sets' }, doneSlots.map(([s, i]) => el('li', { class: recordSlots.has(s) ? 'gold' : '' }, [
-            el('span', { class: 'muted small', text: slotLabel(entry, i) }),
-            el('span', { text: ` ${formatValues(entry, [s])}${recordSlots.has(s) ? ' ★' : ''}` }),
-          ])))
+        doneSlots.length || state.editing
+          ? el('ul', { class: 'plain-list sum-sets' }, (state.editing ? slots.map((s, i) => [s, i]) : doneSlots).map(([s, i]) => {
+            const text = ` ${s.done ? formatValues(entry, [s]) : 'neodcvičeno'}${recordSlots.has(s) ? ' ★' : ''}`;
+            if (!state.editing) {
+              return el('li', { class: recordSlots.has(s) ? 'gold' : '' }, [
+                el('span', { class: 'muted small', text: slotLabel(entry, i) }),
+                el('span', { text }),
+              ]);
+            }
+            return el('li', {}, [el('button', {
+              type: 'button', class: 'set-edit',
+              onclick: async () => { if (await editSlot(entry, s)) redraw(); },
+            }, [el('span', { class: 'muted small', text: `${slotLabel(entry, i)} ✎` }), el('span', { text })])]);
+          }))
           : el('span', { class: 'muted small block', text: 'Neodcvičeno' }),
-        entry.note ? el('span', { class: 'small block', text: `Poznámka: ${entry.note}` }) : null,
-        entry.next ? el('span', { class: 'muted small block', text: `Na příště: ${{ more: 'přidat', keep: 'nechat', less: 'snížit' }[entry.next]}` }) : null,
+        state.editing
+          ? el('button', {
+            type: 'button', class: 'btn btn-small', text: entry.note ? `Poznámka: ${entry.note}` : 'Přidat poznámku',
+            onclick: async () => {
+              const text = await promptText({ title: 'Poznámka k cviku', value: entry.note ?? '' });
+              if (text != null) { entry.note = text; redraw(); }
+            },
+          })
+          : entry.note ? el('span', { class: 'small block', text: `Poznámka: ${entry.note}` }) : null,
+        entry.next && entry.next !== 'keep' ? el('span', { class: 'muted small block', text: `Na příště: ${{ more: 'přidat', less: 'snížit' }[entry.next]}` }) : null,
       ]);
     }),
   ]));
@@ -117,7 +143,7 @@ export async function render(container, { params }) {
   ]));
 
   // Akce
-  if (editable) {
+  if (workout.status === 'active') {
     stack.append(el('div', { class: 'stack' }, [
       el('button', {
         type: 'button', class: 'btn btn-primary btn-hero',
@@ -133,15 +159,79 @@ export async function render(container, { params }) {
         onclick: async () => { workout.endedAt = null; await saveWorkout(workout); navigate('trenink'); },
       }),
     ]));
+  } else if (state.editing) {
+    stack.append(el('div', { class: 'row-2' }, [
+      el('button', {
+        type: 'button', class: 'btn', text: 'Zrušit',
+        onclick: async () => {
+          Object.assign(workout, await getWorkout(workout.id)); // zahodit neuložené úpravy
+          state.editing = false;
+          await redraw();
+        },
+      }),
+      el('button', {
+        type: 'button', class: 'btn btn-primary', text: 'Uložit změny',
+        onclick: async () => {
+          workout.scales = scales;
+          workout.comment = comment.value.trim();
+          await saveWorkout(workout);
+          state.editing = false;
+          toast('Změny uloženy');
+          await redraw();
+        },
+      }),
+    ]));
   } else {
-    stack.append(el('button', {
-      type: 'button', class: 'btn btn-danger', text: 'Smazat trénink',
-      onclick: async () => {
-        const ok = await confirmDialog({ title: 'Smazat tento trénink?', text: 'Záznam zmizí z historie i ze statistik.', okLabel: 'Smazat', danger: true });
-        if (ok) { await deleteWorkout(workout.id); toast('Trénink smazán'); navigate('domu'); }
-      },
-    }));
+    stack.append(el('div', { class: 'row-2' }, [
+      el('button', {
+        type: 'button', class: 'btn', text: 'Upravit',
+        onclick: async () => { state.editing = true; await redraw(); },
+      }),
+      el('button', {
+        type: 'button', class: 'btn btn-danger', text: 'Smazat trénink',
+        onclick: async () => {
+          const ok = await confirmDialog({ title: 'Smazat tento trénink?', text: 'Záznam zmizí z historie i ze statistik.', okLabel: 'Smazat', danger: true });
+          if (ok) { await deleteWorkout(workout.id); toast('Trénink smazán'); navigate('domu'); }
+        },
+      }),
+    ]));
   }
+}
+
+// Dialog pro úpravu jedné série: váha / opakování (nebo výdrž) a zda byla odcvičená.
+function editSlot(entry, slot) {
+  return openDialog((close) => {
+    const numInput = (val) => el('input', { type: 'text', class: 'input', inputmode: 'decimal', value: val == null ? '' : String(val).replace('.', ','), autocomplete: 'off' });
+    const weight = entry.type === 'reps' ? null : numInput(slot.weight);
+    const reps = entry.type === 'time' ? null : numInput(slot.reps);
+    const seconds = entry.type === 'time' ? numInput(slot.seconds) : null;
+    let done = slot.done;
+    const doneBtn = el('button', {
+      type: 'button', class: `btn btn-small ${done ? 'btn-primary' : ''}`, text: done ? 'Odcvičeno' : 'Neodcvičeno',
+      onclick: () => { done = !done; doneBtn.textContent = done ? 'Odcvičeno' : 'Neodcvičeno'; doneBtn.classList.toggle('btn-primary', done); },
+    });
+    const parse = (input) => parseFloat(String(input.value).replace(',', '.'));
+    const form = el('form', { method: 'dialog', class: 'dialog-body' }, [
+      el('h2', { class: 'dialog-title', text: 'Upravit sérii' }),
+      weight ? el('label', { class: 'field-label', text: entry.bodyweight ? 'Přidaná váha (kg)' : 'Váha (kg)' }) : null, weight,
+      reps ? el('label', { class: 'field-label', text: 'Opakování' }) : null, reps,
+      seconds ? el('label', { class: 'field-label', text: 'Výdrž (s)' }) : null, seconds,
+      el('div', { class: 'note-next' }, [el('span', { class: 'muted small', text: 'Stav' }), doneBtn]),
+      el('div', { class: 'dialog-actions' }, [
+        el('button', { type: 'button', class: 'btn', text: 'Zrušit', onclick: () => close(false) }),
+        el('button', { type: 'submit', class: 'btn btn-primary', text: 'Použít' }),
+      ]),
+    ]);
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (weight) { const v = parse(weight); if (Number.isFinite(v)) slot.weight = Math.round(v * 100) / 100; }
+      if (reps) { const v = parse(reps); if (Number.isFinite(v)) slot.reps = Math.round(v); }
+      if (seconds) { const v = parse(seconds); if (Number.isFinite(v)) slot.seconds = Math.round(v); }
+      if (done !== slot.done) { slot.done = done; slot.doneAt = done ? new Date().toISOString() : null; }
+      close(true);
+    });
+    return form;
+  });
 }
 
 function kv(label, value) {

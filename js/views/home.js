@@ -1,4 +1,4 @@
-import { el, openDialog, toast, dateShort } from '../ui.js';
+import { el, openDialog, toast, dateShort, plural } from '../ui.js';
 import { listTemplates, listGyms, getLastGymId } from '../data.js';
 import { getActiveWorkout, startWorkout, listDoneWorkouts } from '../workout.js';
 import { navigate } from '../router.js';
@@ -52,7 +52,7 @@ async function onNewWorkout() {
       },
     }, [
       el('span', { class: 'choice-title', text: `${t.order}. ${t.name}` }),
-      el('span', { class: 'muted small', text: t.exercises.length ? `${t.subtitle} · ${t.exercises.length} cviků` : `${t.subtitle} · bez cviků` }),
+      el('span', { class: 'muted small', text: t.exercises.length ? `${t.subtitle} · ${plural(t.exercises.length, ['cvik', 'cviky', 'cviků'])}` : `${t.subtitle} · bez cviků` }),
     ]));
 
     const gymSelect = el('select', { class: 'input', onchange: (e) => { gymId = e.target.value; } },

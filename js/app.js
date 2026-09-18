@@ -40,6 +40,7 @@ async function init() {
   startRouter(async (name, view, params) => {
     titleEl.textContent = view.title;
     extraEl.replaceChildren();
+    viewEl.className = 'view';
     viewEl.replaceChildren();
     viewEl.scrollTop = 0;
     tabs.forEach((tab) => {
@@ -49,7 +50,7 @@ async function init() {
       else tab.removeAttribute('aria-current');
     });
     try {
-      await view.render(viewEl, { params, extraEl });
+      await view.render(viewEl, { params, extraEl, titleEl });
     } catch (err) {
       console.error(err);
       viewEl.innerHTML = `<section class="card"><h2 class="card-title">Něco se pokazilo</h2>

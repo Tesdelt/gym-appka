@@ -57,12 +57,23 @@ export function promptText({ title, label = '', value = '', placeholder = '', ok
 }
 
 // Číselná výzva. Vrátí číslo, nebo null při zrušení.
+// Textové pole s klávesnicí „decimal“: iOS na ní nabízí čárku podle jazyka
+// a přijímáme čárku i tečku. Záporné hodnoty (guma) přes tlačítko znaménka.
 export function promptNumber({ title, value = 0, step = 'any', min = null, unit = '' }) {
   return openDialog((close) => {
-    const input = el('input', { type: 'number', class: 'input input-number', value: String(value), step, min, inputmode: step === 1 ? 'numeric' : 'decimal' });
+    const numFormat = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2, useGrouping: false });
+    const input = el('input', {
+      type: 'text', class: 'input input-number', value: numFormat.format(Math.abs(value)),
+      inputmode: step === 1 ? 'numeric' : 'decimal', autocomplete: 'off',
+    });
+    let negative = value < 0;
+    const sign = el('button', {
+      type: 'button', class: `btn sign-btn ${negative ? 'is-selected' : ''}`, text: '−', 'aria-label': 'Záporná hodnota (s dopomocí)',
+      onclick: () => { negative = !negative; sign.classList.toggle('is-selected', negative); input.focus(); },
+    });
     const form = el('form', { method: 'dialog', class: 'dialog-body' }, [
       el('h2', { class: 'dialog-title', text: title }),
-      el('div', { class: 'input-row' }, [input, unit ? el('span', { class: 'input-unit', text: unit }) : null]),
+      el('div', { class: 'input-row' }, [min == null ? sign : null, input, unit ? el('span', { class: 'input-unit', text: unit }) : null]),
       el('div', { class: 'dialog-actions' }, [
         el('button', { type: 'button', class: 'btn', text: 'Zrušit', onclick: () => close(null) }),
         el('button', { type: 'submit', class: 'btn btn-primary', text: 'Použít' }),
@@ -70,11 +81,21 @@ export function promptNumber({ title, value = 0, step = 'any', min = null, unit 
     ]);
     form.addEventListener('submit', (e) => {
       e.preventDefault();
-      const n = parseFloat(String(input.value).replace(',', '.'));
-      if (Number.isFinite(n)) close(n);
+      let n = parseFloat(String(input.value).trim().replace(',', '.').replace(/\s/g, ''));
+      if (!Number.isFinite(n)) return;
+      n = Math.abs(n) * (negative ? -1 : 1);
+      if (min != null && n < min) n = min;
+      close(n);
     });
     return form;
   });
+}
+
+// Skloňování: plural(4, ['cvik', 'cviky', 'cviků']) → „4 cviky“
+export function plural(n, forms) {
+  const abs = Math.abs(n);
+  const form = abs === 1 ? forms[0] : abs >= 2 && abs <= 4 ? forms[1] : forms[2];
+  return `${n} ${form}`;
 }
 
 // Potvrzení. Vrátí true/false.

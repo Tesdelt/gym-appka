@@ -25,8 +25,9 @@ export function setSucceeded(entry, set) {
 function direction(entry, last) {
   const lastSlots = doneSlots(last);
   if (!lastSlots.length) return 0;
+  // „Nechat“ je výchozí stav, proto se bere jako „bez výslovné volby“ a platí
+  // automatické pravidlo (splněno vše → přidat).
   if (last.next === 'more') return 1;
-  if (last.next === 'keep') return 0;
   if (last.next === 'less') return -1;
   return lastSlots.every((s) => setSucceeded(last, s)) ? 1 : 0;
 }

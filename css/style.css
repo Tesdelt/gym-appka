@@ -333,7 +333,8 @@ button.list-main { min-height: var(--tap); }
 
 /* ---------- Horní lišta: doplněk (časomíra) ---------- */
 .topbar { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.timer { font-family: var(--font-head); font-weight: 700; font-size: 24px; letter-spacing: 0.04em; color: var(--text-2); }
+.timer-title { font-variant-numeric: tabular-nums; }
+.topbar-extra { display: flex; gap: 6px; }
 
 .section-title {
   margin: 0 0 10px;
@@ -374,20 +375,21 @@ select.input { padding-right: 32px; background-image: none; }
 .ex-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 10px; }
 .ex-name { margin: 0; font-family: var(--font-head); font-weight: 800; font-size: 26px; line-height: 1.05; letter-spacing: 0.02em; }
 .ex-set { flex: none; font-family: var(--font-head); font-weight: 700; font-size: 20px; color: var(--text-2); letter-spacing: 0.03em; white-space: nowrap; }
-.ex-media { display: flex; gap: 12px; align-items: stretch; margin-bottom: 12px; }
+.ex-media { display: flex; gap: 12px; align-items: stretch; margin-bottom: 10px; }
 .ex-image {
-  flex: none; width: 96px; height: 96px; display: flex; align-items: center; justify-content: center;
-  background: var(--bg); border: 1px solid var(--border); color: var(--border);
+  flex: none; width: 76px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  padding: 4px 0; background: var(--bg); border: 1px solid var(--border); color: var(--text-2); cursor: pointer;
 }
-.ex-image svg { width: 56px; height: 56px; }
-.ex-meta { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 4px; }
+.ex-image-pic { display: block; width: 40px; height: 40px; color: var(--border); }
+.ex-image-pic svg { width: 40px; height: 40px; }
+.ex-image-label { font-size: 12px; font-weight: 600; }
+.ex-meta { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
 .meta-row { display: flex; flex-direction: column; }
-.meta-value { font-weight: 600; font-size: 16px; line-height: 1.25; }
+.meta-value { font-weight: 600; font-size: 15px; line-height: 1.2; }
 .ex-meta .btn-small { align-self: flex-start; margin-top: 2px; }
 
-.steppers { display: flex; gap: 10px; margin-bottom: 10px; }
+.steppers { display: flex; gap: 10px; margin-bottom: 8px; }
 .stepper { flex: 1 1 0; min-width: 0; }
-.stepper-weight { flex: 1.25 1 0; }
 .stepper-label { margin-bottom: 4px; font-size: 14px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.04em; }
 .stepper-row { display: flex; align-items: stretch; border: 1px solid var(--border); background: var(--bg); }
 .stepper-btn { flex: none; width: 46px; min-height: 64px; border: 0; background: var(--surface); font-size: 30px; font-weight: 500; }
@@ -400,22 +402,27 @@ select.input { padding-right: 32px; background-image: none; }
 }
 .rest-info { display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid var(--border); }
 .rest-value { font-family: var(--font-head); font-weight: 700; font-size: 22px; letter-spacing: 0.03em; }
-.btn-done { margin-top: 12px; min-height: 68px; }
+.nav-row { display: flex; gap: 8px; margin-top: 8px; }
+.btn-back { flex: none; width: 56px; min-height: 64px; font-size: 26px; }
+.btn-done { flex: 1 1 auto; min-height: 64px; gap: 10px; flex-direction: row; font-family: var(--font-head); font-weight: 800; font-size: 24px; letter-spacing: 0.04em; text-transform: uppercase; }
+.btn-done-arrow { font-size: 30px; font-family: var(--font-body); font-weight: 500; line-height: 1; }
+.btn-done.is-next-exercise { background: #5E1520; border-color: var(--accent); }
 
-.note-block { margin-top: 12px; }
+.note-block { margin-top: 8px; }
+.note-input { min-height: 40px; font-size: 15px; }
 .textarea { min-height: 56px; padding: 10px 12px; resize: vertical; line-height: 1.35; }
-.note-next { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
+.note-next { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; }
 .segmented { display: flex; border: 1px solid var(--border); }
 .seg {
-  flex: 1 1 0; min-width: 44px; min-height: 44px; padding: 0 10px;
+  flex: 1 1 0; min-width: 44px; min-height: 40px; padding: 0 10px;
   border: 0; border-left: 1px solid var(--border); background: var(--bg); color: var(--text-2); font-weight: 600; cursor: pointer;
 }
 .seg:first-child { border-left: 0; }
 .seg.is-selected { background: var(--accent); color: var(--on-accent); }
 .seg:disabled { cursor: default; }
 
-.card-next { display: flex; flex-direction: column; gap: 2px; padding: 12px var(--gutter); }
-.next-name { font-weight: 600; font-size: 18px; }
+.card-next { display: flex; flex-direction: column; gap: 0; padding: 8px var(--gutter); }
+.next-name { font-weight: 600; font-size: 16px; }
 .card-done { border-color: var(--accent); }
 
 /* seznam cviků v tréninku */
@@ -444,3 +451,34 @@ select.input { padding-right: 32px; background-image: none; }
 .scale-label { font-weight: 600; }
 .scale-row .segmented { flex: 0 0 auto; width: 220px; }
 .card .textarea { margin-top: 6px; }
+
+/* ---------- Trénink: jedna obrazovka bez scrollování ---------- */
+.view-workout { display: flex; flex-direction: column; gap: 8px; overflow: hidden; padding: 10px var(--gutter); }
+.view-workout .card-current { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: space-between; padding: 10px var(--gutter) 12px; min-height: 0; }
+.view-workout .card-next { flex: none; }
+.view-workout .ex-name { font-size: 24px; }
+.view-workout .ex-head { margin-bottom: 8px; }
+.view-workout .stepper-btn { min-height: 60px; }
+/* na nízkých displejích se ještě zmenší velké prvky */
+@media (max-height: 700px) {
+  .view-workout .stepper-btn { min-height: 52px; }
+  .view-workout .btn-done, .view-workout .btn-back { min-height: 54px; }
+  .view-workout .ex-image { width: 64px; }
+  .view-workout .ex-image-pic, .view-workout .ex-image-pic svg { width: 32px; height: 32px; }
+}
+
+/* přetahování v seznamu cviků */
+.drag-handle {
+  flex: none; width: 36px; min-height: var(--tap); display: flex; align-items: center; justify-content: center;
+  font-size: 22px; color: var(--text-2); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.ex-row.is-dragging { background: var(--bg); box-shadow: 0 0 0 1px var(--accent); }
+.drag-list .list-row { padding-right: 4px; }
+.sign-btn { flex: none; width: 48px; min-height: 56px; font-size: 26px; }
+.sign-btn.is-selected { background: var(--accent); border-color: var(--accent); }
+.input-row .input-number { flex: 1 1 auto; min-width: 0; }
+
+/* úpravy v historii */
+.set-edit { display: flex; flex-direction: column; align-items: flex-start; gap: 0; padding: 4px 0; border: 0; background: none; color: var(--text); text-align: left; cursor: pointer; }
+.set-edit:active { color: var(--gold); }
+.edit-hint { color: var(--text-2); font-size: 13px; margin-bottom: 6px; }

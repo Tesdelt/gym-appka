@@ -1,4 +1,4 @@
-// Obrazovka průběhu tréninku.
+// Obrazovka průběhu tréninku: vše na jedné obrazovce bez scrollování.
 
 import { el, openDialog, confirmDialog, promptNumber, toast, formatWeight, formatValues, formatRest, dateShort } from '../ui.js';
 import { navigate } from '../router.js';
@@ -7,14 +7,15 @@ import { slotsOf } from '../recommend.js';
 import { pickExercise } from '../exercisePicker.js';
 import {
   getActiveWorkout, saveWorkout, deleteWorkout, currentSlot, completeCurrent, nextUndone, firstUndoneIn,
-  slotLabel, restAfter, entryDone, elapsedSeconds, formatDuration, buildAdHocEntry,
+  positionAfterConfirm, prevInOrder, slotLabel, restAfter, entryDone, elapsedSeconds, formatDuration, buildAdHocEntry,
 } from '../workout.js';
 
-export const title = 'Trénink';
+export const title = '';
 
-export async function render(container, { extraEl }) {
+export async function render(container, { extraEl, titleEl }) {
   const workout = await getActiveWorkout();
   if (!workout) {
+    titleEl.textContent = 'Trénink';
     container.append(el('section', { class: 'card' }, [
       el('h2', { class: 'card-title', text: 'Žádný rozdělaný trénink' }),
       el('button', { type: 'button', class: 'btn btn-primary', text: 'Na Domů', onclick: () => navigate('domu') }),
@@ -22,65 +23,73 @@ export async function render(container, { extraEl }) {
     return;
   }
 
-  // Časomíra v horní liště
-  const timer = el('span', { class: 'timer', text: formatDuration(elapsedSeconds(workout)) });
-  extraEl.append(timer);
+  container.classList.add('view-workout');
+
+  // Horní lišta: časomíra místo nadpisu, vpravo seznam cviků a ukončení
+  titleEl.classList.add('timer-title');
+  titleEl.textContent = formatDuration(elapsedSeconds(workout));
   const tick = setInterval(() => {
-    if (!timer.isConnected) { clearInterval(tick); return; }
-    timer.textContent = formatDuration(elapsedSeconds(workout));
+    if (!container.isConnected || !container.classList.contains('view-workout')) {
+      clearInterval(tick);
+      titleEl.classList.remove('timer-title');
+      return;
+    }
+    titleEl.textContent = formatDuration(elapsedSeconds(workout));
   }, 1000);
 
   let saveTimer = null;
   const save = () => saveWorkout(workout).catch((err) => { console.error(err); toast('Uložení selhalo'); });
   const saveLater = () => { clearTimeout(saveTimer); saveTimer = setTimeout(save, 400); };
+  const ctx = { save, saveLater, draw: () => container.replaceChildren(...screen(workout, ctx)) };
 
-  const draw = () => {
-    container.replaceChildren(...screen(workout, { save, saveLater, draw }));
-  };
-  draw();
+  extraEl.append(
+    el('button', { type: 'button', class: 'btn btn-small', text: 'Cviky', onclick: () => exerciseListSheet(workout, ctx) }),
+    el('button', { type: 'button', class: 'btn btn-small btn-danger', text: 'Ukončit', onclick: () => endWorkout(workout, ctx) }),
+  );
+
+  ctx.draw();
+}
+
+async function endWorkout(workout, ctx) {
+  const anyDone = workout.exercises.some((e) => slotsOf(e).some((s) => s.done));
+  if (!anyDone) {
+    const ok = await confirmDialog({ title: 'Zahodit trénink?', text: 'Žádná série není odcvičená, trénink se neuloží.', okLabel: 'Zahodit', danger: true });
+    if (ok) { await deleteWorkout(workout.id); navigate('domu'); }
+    return;
+  }
+  const ok = await confirmDialog({ title: 'Ukončit trénink?', text: 'Zobrazí se souhrn, trénink se uloží až po potvrzení.', okLabel: 'Ukončit', danger: true });
+  if (ok) {
+    workout.endedAt = new Date().toISOString();
+    await ctx.save();
+    navigate('souhrn');
+  }
 }
 
 function screen(workout, ctx) {
   const cur = currentSlot(workout);
-  const parts = [];
 
   if (!workout.exercises.length) {
-    parts.push(el('section', { class: 'card' }, [
+    return [el('section', { class: 'card' }, [
       el('h2', { class: 'card-title', text: 'Šablona nemá žádné cviky' }),
-      el('p', { class: 'muted small', text: 'Přidej cvik tlačítkem níže, nebo trénink ukonči.' }),
-    ]));
-  } else if (!cur) {
-    parts.push(el('section', { class: 'card card-done' }, [
-      el('h2', { class: 'card-title', text: 'Všechny série hotové' }),
-      el('p', { class: 'muted small', text: 'Můžeš trénink ukončit, nebo ještě přidat cvik.' }),
-    ]));
-  } else {
-    parts.push(currentCard(workout, cur, ctx));
-    parts.push(nextPreview(workout));
+      el('p', { class: 'muted small', text: 'Přidej cvik přes tlačítko Cviky nahoře, nebo trénink ukonči.' }),
+    ])];
   }
+  if (!cur) {
+    return [el('section', { class: 'card card-done' }, [
+      el('h2', { class: 'card-title', text: 'Všechny série hotové' }),
+      el('p', { class: 'muted small', text: 'Ukonči trénink tlačítkem nahoře, nebo ještě přidej cvik.' }),
+      el('button', {
+        type: 'button', class: 'btn', text: 'Zpět na poslední sérii',
+        onclick: () => { workout.cursor = lastPosition(workout); ctx.save(); ctx.draw(); },
+      }),
+    ])];
+  }
+  return [currentCard(workout, cur, ctx), nextPreview(workout)];
+}
 
-  parts.push(el('div', { class: 'row-2' }, [
-    el('button', { type: 'button', class: 'btn', text: 'Cviky v tréninku', onclick: () => exerciseListSheet(workout, ctx) }),
-    el('button', {
-      type: 'button', class: 'btn btn-danger', text: 'Ukončit trénink',
-      onclick: async () => {
-        const anyDone = workout.exercises.some((e) => slotsOf(e).some((s) => s.done));
-        if (!anyDone) {
-          const ok = await confirmDialog({ title: 'Zahodit trénink?', text: 'Žádná série není odcvičená, trénink se neuloží.', okLabel: 'Zahodit', danger: true });
-          if (ok) { await deleteWorkout(workout.id); navigate('domu'); }
-          return;
-        }
-        const ok = await confirmDialog({ title: 'Ukončit trénink?', text: 'Zobrazí se souhrn, trénink se uloží až po potvrzení.', okLabel: 'Ukončit', danger: true });
-        if (ok) {
-          workout.endedAt = new Date().toISOString();
-          await ctx.save();
-          navigate('souhrn');
-        }
-      },
-    }),
-  ]));
-
-  return parts;
+function lastPosition(workout) {
+  const ex = workout.exercises.length - 1;
+  return { ex, slot: slotsOf(workout.exercises[ex]).length - 1 };
 }
 
 // ---------- Aktuální cvik ----------
@@ -88,52 +97,58 @@ function currentCard(workout, cur, ctx) {
   const { entry, slot, index } = cur;
   const rec = recommendationFor(entry, index);
   const rest = restAfter(entry, index);
-
   const card = el('section', { class: 'card card-current' });
 
-  card.append(
-    el('div', { class: 'ex-head' }, [
-      el('h2', { class: 'ex-name', text: entry.name }),
-      el('span', { class: 'ex-set', text: slotLabel(entry, index) }),
+  // Hlavička
+  card.append(el('div', { class: 'ex-head' }, [
+    el('h2', { class: 'ex-name', text: entry.name }),
+    el('span', { class: 'ex-set', text: slotLabel(entry, index) }),
+  ]));
+
+  // Obrázek + minule / doporučení
+  card.append(el('div', { class: 'ex-media' }, [
+    el('button', { type: 'button', class: 'ex-image', 'aria-label': 'Podrobnosti cviku', onclick: () => toast('Detail cviku přibude v kroku 5') }, [
+      el('span', { class: 'ex-image-pic', html: PLACEHOLDER_SVG }),
+      el('span', { class: 'ex-image-label', text: 'Podrobnosti' }),
     ]),
-    el('div', { class: 'ex-media' }, [
-      el('div', { class: 'ex-image', 'aria-hidden': 'true', html: PLACEHOLDER_SVG }),
-      el('div', { class: 'ex-meta' }, [
-        metaRow('Minule', entry.last ? formatValues(entry, entry.last.values) : 'Poprvé', entry.last ? dateShort.format(new Date(entry.last.date)) : ''),
-        metaRow('Doporučení', rec ? formatValues(entry, [rec]) : '–', ''),
-        el('button', { type: 'button', class: 'btn btn-small', text: 'Podrobnosti', onclick: () => toast('Detail cviku přibude v kroku 5') }),
-      ]),
+    el('div', { class: 'ex-meta' }, [
+      metaRow(entry.last ? `Minule ${dateShort.format(new Date(entry.last.date))}` : 'Minule', entry.last ? formatValues(entry, entry.last.values) : 'poprvé'),
+      metaRow('Doporučení', rec ? formatValues(entry, [rec]) : '–'),
     ]),
-  );
+  ]));
 
   // Velká čísla
-  const steppers = el('div', { class: 'steppers' });
+  const steppers = [];
   if (entry.type !== 'reps') {
-    steppers.append(stepper({
-      label: entry.bodyweight ? 'Přidaná váha' : 'Váha',
-      unit: 'kg',
-      value: () => slot.weight,
-      display: () => weightDisplay(slot.weight, entry.bodyweight),
-      step: entry.weightStep,
-      min: entry.bodyweight ? null : 0,
-      set: (v) => { slot.weight = v; ctx.save(); },
-      editTitle: 'Váha (kg)',
-      wide: true,
+    steppers.push(stepper({
+      label: entry.bodyweight ? 'Přidaná váha' : 'Váha', unit: 'kg',
+      value: () => slot.weight, display: () => weightDisplay(slot.weight, entry.bodyweight),
+      step: entry.weightStep, min: entry.bodyweight ? null : 0,
+      set: (v) => { slot.weight = v; ctx.save(); }, editTitle: 'Váha (kg)',
     }));
   }
   if (entry.type === 'time') {
-    steppers.append(stepper({
+    steppers.push(stepper({
       label: 'Výdrž', unit: 's', value: () => slot.seconds, display: () => String(slot.seconds), step: 5, min: 0,
       set: (v) => { slot.seconds = Math.round(v); ctx.save(); }, editTitle: 'Výdrž (s)', intStep: true,
     }));
   } else {
-    steppers.append(stepper({
+    steppers.push(stepper({
       label: 'Opakování', unit: '', value: () => slot.reps, display: () => String(slot.reps), step: 1, min: 0,
       set: (v) => { slot.reps = Math.round(v); ctx.save(); }, editTitle: 'Opakování', intStep: true,
     }));
   }
-  card.append(steppers);
+  card.append(el('div', { class: 'steppers' }, steppers.map((s) => s.root)));
+  // Obě čísla stejně velká: velikost podle nejdelší hodnoty
+  const fitNumbers = () => {
+    const longest = Math.max(...steppers.map((s) => s.text().length));
+    const size = longest > 4 ? '28px' : longest > 3 ? '34px' : '';
+    steppers.forEach((s) => { s.num.style.fontSize = size; });
+  };
+  steppers.forEach((s) => { s.onChange = fitNumbers; });
+  fitNumbers();
 
+  // Doporučení + pauza
   card.append(el('div', { class: 'row-2' }, [
     el('button', {
       type: 'button', class: 'btn', text: 'Použít doporučení', disabled: rec ? null : '',
@@ -151,29 +166,45 @@ function currentCard(workout, cur, ctx) {
     ]),
   ]));
 
-  card.append(el('button', {
-    type: 'button', class: 'btn btn-primary btn-hero btn-done', text: slot.done ? 'Uložit změnu' : 'Hotovo',
-    onclick: () => {
-      completeCurrent(workout);
-      ctx.save();
-      card.classList.add('is-confirmed');
-      setTimeout(() => { ctx.draw(); document.getElementById('view').scrollTop = 0; }, 180);
-    },
-  }));
+  // Navigace: malá šipka zpět, velké potvrzení vpřed
+  const after = positionAfterConfirm(workout);
+  const prev = prevInOrder(workout, workout.cursor);
+  const toNextExercise = Boolean(after) && after.ex !== workout.cursor.ex;
+  let label;
+  let arrow;
+  if (!after) { label = slot.done ? 'Uložit' : 'Hotovo'; arrow = '✓'; }
+  else if (toNextExercise) { label = 'Další cvik'; arrow = '⇥'; }
+  else { label = slot.done ? 'Uložit' : 'Hotovo'; arrow = '→'; }
+
+  card.append(el('div', { class: 'nav-row' }, [
+    el('button', {
+      type: 'button', class: 'btn btn-back', text: '←', 'aria-label': 'Předchozí série', disabled: prev ? null : '',
+      onclick: () => { workout.cursor = prev; ctx.save(); ctx.draw(); },
+    }),
+    el('button', {
+      type: 'button', class: `btn btn-primary btn-done ${toNextExercise ? 'is-next-exercise' : ''}`,
+      onclick: () => {
+        completeCurrent(workout);
+        ctx.save();
+        card.classList.add('is-confirmed');
+        setTimeout(() => ctx.draw(), 160);
+      },
+    }, [el('span', { class: 'btn-done-label', text: label }), el('span', { class: 'btn-done-arrow', text: arrow })]),
+  ]));
 
   // Poznámka a volba na příště
-  const note = el('textarea', {
-    class: 'input textarea', rows: 2, placeholder: 'Poznámka k cviku (např. „10 opakování, ale ne v celku“)',
+  const note = el('input', {
+    type: 'text', class: 'input note-input', placeholder: 'Poznámka k cviku…', autocomplete: 'off',
     oninput: (e) => { entry.note = e.target.value; ctx.saveLater(); },
   });
   note.value = entry.note ?? '';
   const choices = [['more', 'Přidat'], ['keep', 'Nechat'], ['less', 'Snížit']];
   const seg = el('div', { class: 'segmented', role: 'group', 'aria-label': 'Na příště' },
-    choices.map(([value, label]) => el('button', {
-      type: 'button', class: `seg ${entry.next === value ? 'is-selected' : ''}`, text: label,
+    choices.map(([value, text]) => el('button', {
+      type: 'button', class: `seg ${(entry.next ?? 'keep') === value ? 'is-selected' : ''}`, text,
       onclick: (e) => {
-        entry.next = entry.next === value ? null : value;
-        seg.querySelectorAll('.seg').forEach((b) => b.classList.toggle('is-selected', b === e.currentTarget && entry.next === value));
+        entry.next = value;
+        seg.querySelectorAll('.seg').forEach((b) => b.classList.toggle('is-selected', b === e.currentTarget));
         ctx.save();
       },
     })));
@@ -185,9 +216,9 @@ function currentCard(workout, cur, ctx) {
   return card;
 }
 
-function metaRow(label, value, sub) {
+function metaRow(label, value) {
   return el('div', { class: 'meta-row' }, [
-    el('span', { class: 'muted small', text: label + (sub ? ` (${sub})` : '') }),
+    el('span', { class: 'muted small', text: label }),
     el('span', { class: 'meta-value', text: value }),
   ]);
 }
@@ -206,14 +237,10 @@ function weightDisplay(kg, bodyweight) {
   return '0';
 }
 
-function stepper({ label, unit, value, display, step, min, set, editTitle, intStep = false, wide = false }) {
+function stepper({ label, unit, value, display, step, min, set, editTitle, intStep = false }) {
+  const api = { onChange: null };
   const num = el('button', { type: 'button', class: 'stepper-value', 'aria-label': `${label}: upravit` });
-  const refresh = () => {
-    const text = display();
-    num.textContent = text;
-    // delší hodnoty (+12,5) zmenšit, aby se vešly mezi tlačítka
-    num.style.fontSize = text.length > 4 ? '28px' : text.length > 3 ? '34px' : '';
-  };
+  const refresh = () => { num.textContent = display(); api.onChange?.(); };
   refresh();
   const change = (delta) => {
     let v = Math.round((value() + delta) * 100) / 100;
@@ -223,9 +250,11 @@ function stepper({ label, unit, value, display, step, min, set, editTitle, intSt
   };
   num.addEventListener('click', async () => {
     const v = await promptNumber({ title: editTitle, value: value(), step: intStep ? 1 : 'any', min, unit });
-    if (v != null) { set(min != null ? Math.max(min, v) : v); refresh(); }
+    if (v != null) { set(v); refresh(); }
   });
-  return el('div', { class: `stepper ${wide ? 'stepper-weight' : ''}` }, [
+  api.num = num;
+  api.text = display;
+  api.root = el('div', { class: 'stepper' }, [
     el('div', { class: 'stepper-label' }, [el('span', { text: label }), unit ? el('span', { class: 'muted', text: ` ${unit}` }) : null]),
     el('div', { class: 'stepper-row' }, [
       el('button', { type: 'button', class: 'btn stepper-btn', text: '−', 'aria-label': `${label} minus`, onclick: () => change(-step) }),
@@ -233,6 +262,7 @@ function stepper({ label, unit, value, display, step, min, set, editTitle, intSt
       el('button', { type: 'button', class: 'btn stepper-btn', text: '+', 'aria-label': `${label} plus`, onclick: () => change(step) }),
     ]),
   ]);
+  return api;
 }
 
 // ---------- Náhled dalšího cviku ----------
@@ -249,53 +279,92 @@ function nextPreview(workout) {
   }
   return el('section', { class: 'card card-next' }, [
     el('span', { class: 'muted small', text: next ? 'Další cvik' : 'Poslední cvik v tréninku' }),
-    next ? el('span', { class: 'next-name', text: next.name }) : null,
-    next ? el('span', { class: 'muted small', text: describeEntry(next) }) : null,
+    next ? el('span', { class: 'next-name' }, [next.name, el('span', { class: 'muted small', text: ` · ${describeEntry(next)}` })]) : null,
   ]);
 }
 
 function describeEntry(entry) {
   const slots = slotsOf(entry);
   const first = slots[0];
+  if (entry.mode === 'dropset') return `drop set, ${entry.rounds.length} kola × ${entry.rounds[0].steps.length} váhy`;
   const weight = entry.type === 'reps' ? '' : `${formatWeight(first.weight, { bodyweight: entry.bodyweight })}, `;
   const value = entry.type === 'time' ? `${first.seconds} s` : `${first.reps}`;
-  if (entry.mode === 'dropset') return `drop set, ${entry.rounds.length} kola × ${entry.rounds[0].steps.length} váhy`;
   return `${weight}${slots.length} × ${value}`;
 }
 
-// ---------- Seznam cviků v tréninku ----------
+// ---------- Seznam cviků v tréninku (přetažením se mění pořadí) ----------
 async function exerciseListSheet(workout, ctx) {
   await openDialog((close) => {
     const body = el('div', { class: 'dialog-body' });
+    const list = el('ul', { class: 'list drag-list' });
+
     const draw = () => {
-      body.replaceChildren(
-        el('h2', { class: 'dialog-title', text: 'Cviky v tréninku' }),
-        el('ul', { class: 'list' }, workout.exercises.map((entry, i) => {
-          const slots = slotsOf(entry);
-          const doneCount = slots.filter((s) => s.done).length;
-          const isCurrent = workout.cursor?.ex === i;
-          return el('li', { class: `list-row list-row-stacked ex-row ${isCurrent ? 'is-current' : ''}` }, [
-            el('button', {
-              type: 'button', class: 'list-main',
-              onclick: () => { workout.cursor = { ex: i, slot: firstUndoneIn(entry) }; ctx.save(); close(); ctx.draw(); },
-            }, [
-              el('span', { class: 'block', text: `${i + 1}. ${entry.name}` }),
-              el('span', { class: `muted small block ${doneCount === slots.length ? 'is-done' : ''}`, text: `${doneCount}/${slots.length} hotovo${isCurrent ? ' · právě cvičím' : ''}` }),
-            ]),
-            el('div', { class: 'row-actions' }, [
-              el('button', { type: 'button', class: 'btn btn-small', text: '↑', 'aria-label': 'Posunout nahoru', disabled: i === 0 ? '' : null, onclick: () => move(i, -1) }),
-              el('button', { type: 'button', class: 'btn btn-small', text: '↓', 'aria-label': 'Posunout dolů', disabled: i === workout.exercises.length - 1 ? '' : null, onclick: () => move(i, 1) }),
-              el('button', { type: 'button', class: 'btn btn-small', text: 'Nahradit', onclick: () => replace(i) }),
-              el('button', { type: 'button', class: 'btn btn-small', text: 'Odebrat', onclick: () => removeAt(i) }),
-            ]),
-          ]);
-        })),
-        el('div', { class: 'dialog-actions' }, [
-          el('button', { type: 'button', class: 'btn', text: '+ Přidat cvik', onclick: add }),
-          el('button', { type: 'button', class: 'btn btn-primary', text: 'Zavřít', onclick: () => close() }),
-        ]),
-      );
+      list.replaceChildren(...workout.exercises.map((entry, i) => {
+        const slots = slotsOf(entry);
+        const doneCount = slots.filter((s) => s.done).length;
+        const isCurrent = workout.cursor?.ex === i;
+        const row = el('li', { class: `list-row ex-row ${isCurrent ? 'is-current' : ''}`, 'data-index': i }, [
+          el('span', { class: 'drag-handle', 'aria-label': 'Přetáhnout', html: '&#8801;' }),
+          el('button', {
+            type: 'button', class: 'list-main',
+            onclick: () => { workout.cursor = { ex: i, slot: firstUndoneIn(entry) }; ctx.save(); close(); ctx.draw(); },
+          }, [
+            el('span', { class: 'block', text: entry.name }),
+            el('span', { class: `muted small block ${doneCount === slots.length ? 'is-done' : ''}`, text: `${doneCount}/${slots.length} hotovo${isCurrent ? ' · právě cvičím' : ''}` }),
+          ]),
+          el('button', { type: 'button', class: 'btn btn-small', text: 'Nahradit', onclick: () => replace(i) }),
+          el('button', { type: 'button', class: 'btn btn-small btn-icon', html: '&times;', 'aria-label': 'Odebrat', onclick: () => removeAt(i) }),
+        ]);
+        attachDrag(row);
+        return row;
+      }));
     };
+
+    body.append(
+      el('h2', { class: 'dialog-title', text: 'Cviky v tréninku' }),
+      el('p', { class: 'muted small', text: 'Klepnutím přeskočíš na cvik, za ≡ přetáhneš pořadí.' }),
+      list,
+      el('div', { class: 'dialog-actions' }, [
+        el('button', { type: 'button', class: 'btn', text: '+ Přidat cvik', onclick: add }),
+        el('button', { type: 'button', class: 'btn btn-primary', text: 'Zavřít', onclick: () => close() }),
+      ]),
+    );
+
+    // Přetahování: řádek se za úchyt táhne prstem, ostatní se mu vyhýbají.
+    function attachDrag(row) {
+      const handle = row.querySelector('.drag-handle');
+      handle.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        handle.setPointerCapture(e.pointerId);
+        row.classList.add('is-dragging');
+        const onMove = (ev) => {
+          const rows = [...list.children].filter((r) => r !== row);
+          const target = rows.find((r) => {
+            const b = r.getBoundingClientRect();
+            return ev.clientY < b.top + b.height / 2;
+          });
+          if (target) list.insertBefore(row, target);
+          else list.append(row);
+        };
+        const onUp = () => {
+          handle.removeEventListener('pointermove', onMove);
+          handle.removeEventListener('pointerup', onUp);
+          handle.removeEventListener('pointercancel', onUp);
+          row.classList.remove('is-dragging');
+          const order = [...list.children].map((r) => Number(r.dataset.index));
+          if (order.some((v, i) => v !== i)) {
+            const currentUid = workout.cursor ? workout.exercises[workout.cursor.ex]?.uid : null;
+            workout.exercises = order.map((i) => workout.exercises[i]);
+            if (currentUid) workout.cursor.ex = workout.exercises.findIndex((e) => e.uid === currentUid);
+            ctx.save(); ctx.draw();
+          }
+          draw();
+        };
+        handle.addEventListener('pointermove', onMove);
+        handle.addEventListener('pointerup', onUp);
+        handle.addEventListener('pointercancel', onUp);
+      });
+    }
 
     const fixCursor = () => {
       if (!workout.exercises.length) { workout.cursor = null; return; }
@@ -304,15 +373,7 @@ async function exerciseListSheet(workout, ctx) {
         workout.cursor = nextUndone(workout, null);
       }
     };
-    const move = (i, dir) => {
-      const j = i + dir;
-      const list = workout.exercises;
-      [list[i], list[j]] = [list[j], list[i]];
-      if (workout.cursor?.ex === i) workout.cursor.ex = j;
-      else if (workout.cursor?.ex === j) workout.cursor.ex = i;
-      ctx.save(); draw(); ctx.draw();
-    };
-    const removeAt = async (i) => {
+    async function removeAt(i) {
       const entry = workout.exercises[i];
       const ok = await confirmDialog({ title: `Odebrat „${entry.name}“?`, okLabel: 'Odebrat', danger: true });
       if (!ok) return;
@@ -321,24 +382,22 @@ async function exerciseListSheet(workout, ctx) {
       else if (workout.cursor?.ex === i) workout.cursor = null;
       fixCursor();
       ctx.save(); draw(); ctx.draw();
-    };
-    const add = async () => {
+    }
+    async function add() {
       const exercise = await pickExercise({ title: 'Přidat cvik' });
       if (!exercise) return;
-      const entry = await buildAdHocEntry(exercise, workout.gymId, await listTemplates());
-      workout.exercises.push(entry);
+      workout.exercises.push(await buildAdHocEntry(exercise, workout.gymId, await listTemplates()));
       fixCursor();
       ctx.save(); draw(); ctx.draw();
-    };
-    const replace = async (i) => {
+    }
+    async function replace(i) {
       const exercise = await pickExercise({ title: 'Nahradit cvik' });
       if (!exercise) return;
-      const entry = await buildAdHocEntry(exercise, workout.gymId, await listTemplates());
-      workout.exercises[i] = entry;
+      workout.exercises[i] = await buildAdHocEntry(exercise, workout.gymId, await listTemplates());
       if (workout.cursor?.ex === i) workout.cursor.slot = 0;
       fixCursor();
       ctx.save(); draw(); ctx.draw();
-    };
+    }
 
     draw();
     return body;
