@@ -8,6 +8,11 @@
 
 export const TIME_STEP = 5; // sekund
 
+// Čas výdrže vždy zaokrouhlený na násobek 5 s (min. 5 s)
+export function round5(sec) {
+  return Math.max(TIME_STEP, Math.round((sec ?? 0) / TIME_STEP) * TIME_STEP);
+}
+
 export function rangeFor(templateSet, templateItem) {
   if (templateItem?.repRange) return { ...templateItem.repRange };
   const base = templateSet.reps ?? 10;
@@ -46,7 +51,7 @@ export function slotsOf(entry) {
 function shift(entry, ref, range, dir) {
   const step = entry.weightStep ?? 2.5;
   if (entry.type === 'time') {
-    return { weight: ref.weight ?? 0, seconds: Math.max(0, (ref.seconds ?? 0) + dir * TIME_STEP) };
+    return { weight: ref.weight ?? 0, seconds: round5(round5(ref.seconds) + dir * TIME_STEP) };
   }
   if (entry.type === 'reps') {
     return { reps: Math.max(1, (ref.reps ?? 0) + dir) };

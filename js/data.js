@@ -182,7 +182,7 @@ export async function reorderTemplates(ids) {
 // Výchozí položka šablony pro cvik
 export function defaultTemplateItem(exercise) {
   const set = exercise.type === 'time'
-    ? { weight: 0, seconds: 30, rest: 180 }
+    ? { weight: 0, seconds: 60, rest: 180 }
     : { weight: exercise.type === 'reps' ? 0 : 10, reps: 10, rest: 180 };
   return { exerciseId: exercise.id, mode: 'sets', sets: [{ ...set }, { ...set }, { ...set }], repRange: null, weightStep: null };
 }

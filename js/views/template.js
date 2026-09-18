@@ -239,7 +239,7 @@ async function renderItem(container, template, index) {
         el('div', { class: 'set-grid cols-2' }, [
           hasWeight ? stepField(wLabel, set.weight, step, wMin, (v) => { set.weight = v; save(); }).root : null,
           isTime
-            ? stepField('Výdrž (s)', set.seconds, 5, 5, (v) => { set.seconds = Math.round(v); save(); }).root
+            ? stepField('Výdrž (s)', set.seconds, 5, 5, (v) => { set.seconds = Math.round(v); save(); }, { snap: true }).root
             : stepField('Opakování', set.reps, 1, 1, (v) => { set.reps = Math.round(v); save(); }).root,
           stepField('Pauza (min)', set.rest / 60, 0.5, 0, (v) => { set.rest = Math.round(v * 60); save(); }).root,
         ]),

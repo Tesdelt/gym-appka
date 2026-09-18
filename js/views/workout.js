@@ -173,7 +173,7 @@ function currentCard(workout, cur, ctx) {
   }
   if (entry.type === 'time') {
     steppers.push(stepper({
-      label: 'Výdrž', unit: 's', value: () => slot.seconds, display: (v) => String(v), step: 5, min: 5,
+      label: 'Výdrž', unit: 's', value: () => slot.seconds, display: (v) => String(v), step: 5, min: 5, snap: true,
       set: (v) => { slot.seconds = Math.round(v); ctx.save(); cd.refresh(); }, editTitle: 'Výdrž (s)', intStep: true,
     }));
   } else {
@@ -219,6 +219,11 @@ function currentCard(workout, cur, ctx) {
     el('button', {
       type: 'button', class: `btn btn-primary btn-done ${toNextExercise ? 'is-next-exercise' : ''}`,
       onclick: () => {
+        if (cd) {
+          const held = cd.heldSeconds();
+          if (held != null && held < slot.seconds) { slot.seconds = Math.max(1, held); toast(`Zapsáno ${slot.seconds} s`); }
+          cd.stop();
+        }
         const record = isNewRecord(workout, cur, ctx);
         card.classList.add('is-confirmed');
         if (record) { cur.slot.pr = true; celebrate(); toast('Nový osobní rekord!'); }
@@ -295,7 +300,7 @@ function weightDisplay(kg, bodyweight) {
 
 // Stepper: uprostřed hodnota, po stranách napůl schovaná sousední čísla
 // (o krok níž / výš). Při změně se celý pás rychle posune jako při swipu.
-function stepper({ label, unit, value, display, step, min, set, editTitle, intStep = false }) {
+function stepper({ label, unit, value, display, step, min, set, editTitle, intStep = false, snap = false }) {
   const api = {};
   const round = (v) => Math.round(v * 100) / 100;
   const prevEl = el('span', { class: 'sv sv-prev', 'aria-hidden': 'true' });
@@ -315,7 +320,9 @@ function stepper({ label, unit, value, display, step, min, set, editTitle, intSt
   };
   refresh();
   const change = (delta) => {
-    let v = round(value() + delta);
+    const cur = value();
+    // přichycení na násobky kroku: ze 2 s tlačítkem + na 5 s, ne na 7 s
+    let v = snap ? round(delta > 0 ? Math.floor(cur / step) * step + step : Math.ceil(cur / step) * step - step) : round(cur + delta);
     if (min != null && v < min) v = min;
     if (v === value()) return;
     set(v);
@@ -323,8 +330,12 @@ function stepper({ label, unit, value, display, step, min, set, editTitle, intSt
     slideValue(track, curEl, Math.sign(delta));
   };
   num.addEventListener('click', async () => {
-    const v = await promptNumber({ title: editTitle, value: value(), step: intStep ? 1 : 'any', min, unit });
-    if (v != null) { set(v); refresh(); }
+    let v = await promptNumber({ title: editTitle, value: value(), step: intStep ? 1 : 'any', min, unit });
+    if (v == null) return;
+    if (snap) v = Math.round(v / step) * step;
+    if (min != null && v < min) v = min;
+    set(v);
+    refresh();
   });
   api.num = num;
   api.root = el('div', { class: 'stepper' }, [
@@ -356,6 +367,7 @@ function countdown(getSeconds) {
   const small = el('span', { class: 'cd-small' });
   const btn = el('button', { type: 'button', class: 'countdown-btn', 'aria-label': 'Odpočet výdrže' }, [big, small]);
   let left = null; // zbývající ms (pauza), null = připraveno
+  let total = null; // délka právě běžícího / pozastaveného odpočtu (ms)
   let endAt = null; // běží do tohoto času
   let raf = null;
   let wakeLock = null;
@@ -404,7 +416,8 @@ function countdown(getSeconds) {
       release();
       return;
     }
-    endAt = Date.now() + (left ?? getSeconds() * 1000);
+    if (left == null) total = getSeconds() * 1000;
+    endAt = Date.now() + (left ?? total);
     left = null;
     btn.classList.remove('is-paused');
     btn.classList.add('is-running');
@@ -413,7 +426,17 @@ function countdown(getSeconds) {
     tick();
   });
   idle();
-  return { root: btn, refresh: () => { if (endAt == null) idle(); } };
+  return {
+    root: btn,
+    refresh: () => { if (endAt == null) idle(); },
+    // odvisené sekundy, pokud odpočet běží nebo je zastavený; jinak null
+    heldSeconds: () => {
+      if (endAt != null) return Math.round((total - Math.max(0, endAt - Date.now())) / 1000);
+      if (left != null) return Math.round((total - left) / 1000);
+      return null;
+    },
+    stop: () => idle(),
+  };
 }
 
 // ---------- Náhled dalšího cviku ----------
@@ -527,8 +550,34 @@ async function exerciseListSheet(workout, ctx) {
 // ---------- Ukazatel postupu (jako kapitoly na YouTube) ----------
 // Cviky jsou oddělené větší mezerou s čárkou, série menší mezerou.
 // Hotové série se plynule vyplní rudou.
+// Náhodný pás bublinek (dlouhý 900 px, aby se opakování nedalo poznat):
+// různé velikosti, výšky a rozestupy, někdy shluk, někdy dlouho nic.
+const BUBBLE_PERIOD = 900;
+function bubblePattern() {
+  const circles = [];
+  let x = 0;
+  while (x < BUBBLE_PERIOD) {
+    const cluster = Math.random() < 0.25 ? 2 + Math.floor(Math.random() * 3) : 1;
+    for (let i = 0; i < cluster; i++) {
+      const cx = x + i * (3 + Math.random() * 6);
+      const cy = 3 + Math.random() * 10;
+      const r = 0.7 + Math.random() ** 1.6 * 1.9;
+      const o = (0.45 + Math.random() * 0.4).toFixed(2);
+      for (const shift of [-BUBBLE_PERIOD, 0, BUBBLE_PERIOD]) {
+        circles.push(`<circle cx="${(cx + shift).toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(2)}" fill-opacity="${o}"/>`);
+      }
+    }
+    x += Math.random() < 0.2 ? 45 + Math.random() * 90 : 6 + Math.random() * 28;
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${BUBBLE_PERIOD}" height="16" viewBox="0 0 ${BUBBLE_PERIOD} 16">${circles.join('')}</svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
+let bubbles = null;
+
 function progressBar(onJump) {
   const root = el('div', { class: 'wprog', role: 'progressbar', 'aria-label': 'Postup tréninku, klepnutím přejdeš na sérii', 'aria-valuemin': 0, 'aria-valuemax': 100 });
+  bubbles ??= bubblePattern();
+  root.style.setProperty('--bubbles', bubbles);
   // klepnutí: cvik podle bloku, série podle místa v bloku
   root.addEventListener('click', (e) => {
     const group = e.target.closest('.wprog-ex') ?? [...root.children].find((g) => {
@@ -583,9 +632,9 @@ function progressBar(onJump) {
       const off = node.getBoundingClientRect().left - base.left;
       for (const layer of node.querySelectorAll('.wl-wave, .wl-bubbles')) {
         layer.style.left = `${-off}px`;
-        layer.style.width = `${width + 60}px`;
+        layer.style.width = `${width + BUBBLE_PERIOD}px`;
         const fast = node.classList.contains('is-current');
-        const dur = layer.classList.contains('wl-wave') ? (fast ? 0.5 : 0.9) : (fast ? 0.35 : 0.55);
+        const dur = layer.classList.contains('wl-wave') ? (fast ? 0.5 : 0.9) : (fast ? 6.9 : 10.7);
         layer.style.animationDelay = `${-(now % dur)}s`;
       }
     }

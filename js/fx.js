@@ -134,8 +134,7 @@ export function shockwave(x, y) {
   setTimeout(() => layer.remove(), 1000);
   shake([
     { transform: 'none' },
-    { transform: 'scale(0.992)', offset: 0.35 },
-    { transform: 'scale(1.004)', offset: 0.6 },
+    { transform: 'scale(0.992)', offset: 0.4 },
     { transform: 'none' },
-  ], 600);
+  ], 220);
 }

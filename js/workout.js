@@ -13,7 +13,7 @@
 
 import { getAll, get, put, remove, newId } from './db.js';
 import { getExercise, getTemplate, weightStepFor, setLastGymId } from './data.js';
-import { rangeFor, recommendSets, recommendDropset, slotsOf } from './recommend.js';
+import { rangeFor, recommendSets, recommendDropset, slotsOf, round5 } from './recommend.js';
 import { listGoals, activeGoalFor, evaluateGoal, goalDelta } from './goals.js';
 
 // ---------- Načtení ----------
@@ -83,7 +83,7 @@ function slotFrom(templateSet, range, rest, exercise) {
   const plan = {
     weight: exercise.type === 'reps' ? 0 : (templateSet.weight ?? 0),
     reps: exercise.type === 'time' ? null : (templateSet.reps ?? 10),
-    seconds: exercise.type === 'time' ? (templateSet.seconds ?? 30) : null,
+    seconds: exercise.type === 'time' ? round5(templateSet.seconds ?? 60) : null,
   };
   return { plan, range, rest, ...plan, done: false, doneAt: null };
 }
@@ -163,7 +163,7 @@ function applyGoal(entry, exercise, gymId, last, doneWorkouts, goals) {
     const v = { weight: ref.weight, reps: ref.reps, seconds: ref.seconds };
     if (d.metric === 'weight') v.weight = Math.round((ref.weight + d.delta) * 100) / 100;
     if (d.metric === 'reps') v.reps = (ref.reps ?? 0) + d.delta;
-    if (d.metric === 'seconds') v.seconds = (ref.seconds ?? 0) + d.delta;
+    if (d.metric === 'seconds') v.seconds = round5((ref.seconds ?? 0) + d.delta);
     if (entry.type === 'reps') delete v.weight;
     return v;
   });
@@ -180,7 +180,7 @@ function applyValues(slot, values) {
   if (!values) return;
   if (values.weight != null) slot.weight = values.weight;
   if (values.reps != null) slot.reps = values.reps;
-  if (values.seconds != null) slot.seconds = values.seconds;
+  if (values.seconds != null) slot.seconds = round5(values.seconds);
   slot.plan = { weight: slot.weight, reps: slot.reps, seconds: slot.seconds };
 }
 
@@ -188,7 +188,8 @@ function prefill(slot, ref) {
   if (!ref) return;
   slot.weight = ref.weight ?? slot.weight;
   slot.reps = ref.reps ?? slot.reps;
-  slot.seconds = ref.seconds ?? slot.seconds;
+  // skutečně odvisený čas (např. 48 s) se nabídne zaokrouhlený na 5 s
+  slot.seconds = ref.seconds != null ? round5(ref.seconds) : slot.seconds;
   slot.plan = { weight: slot.weight, reps: slot.reps, seconds: slot.seconds };
 }
 
@@ -202,7 +203,7 @@ export async function buildAdHocEntry(exercise, gymId, templates) {
     if (item) break;
   }
   if (!item) {
-    const base = exercise.type === 'time' ? { weight: 0, seconds: 30, rest: 180 } : { weight: 0, reps: 10, rest: 180 };
+    const base = exercise.type === 'time' ? { weight: 0, seconds: 60, rest: 180 } : { weight: 0, reps: 10, rest: 180 };
     item = { mode: 'sets', sets: [base, base, base], repRange: null, weightStep: null };
   }
   return buildEntry(item, exercise, gymId, done, goals);

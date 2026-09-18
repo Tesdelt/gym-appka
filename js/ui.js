@@ -98,14 +98,16 @@ export function promptNumber({ title, value = 0, step = 'any', min = null, unit 
 
 // Číselné pole s tlačítky +/− a možností ručního zadání (čárka i tečka).
 // Vrací { root, input, value() }.
-export function stepField(label, value, step, min = null, onChange = null) {
+export function stepField(label, value, step, min = null, onChange = null, { snap = false } = {}) {
   const fmt = (v) => (v == null || !Number.isFinite(v) ? '' : new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2, useGrouping: false }).format(v));
   const read = () => parseFloat(String(input.value).replace(',', '.').replace(/\s/g, ''));
   const input = el('input', { type: 'text', class: 'input edit-field', inputmode: 'decimal', value: fmt(value), autocomplete: 'off' });
   const bump = (d) => {
     let v = read();
     if (!Number.isFinite(v)) v = 0;
-    v = Math.round((v + d) * 100) / 100;
+    // přichycení: z 2 s tlačítkem + na 5, ne na 7
+    v = snap ? (d > 0 ? Math.floor(v / step) * step + step : Math.ceil(v / step) * step - step) : v + d;
+    v = Math.round(v * 100) / 100;
     if (min != null && v < min) v = min;
     input.value = fmt(v);
     onChange?.(v);
@@ -114,6 +116,7 @@ export function stepField(label, value, step, min = null, onChange = null) {
     input.addEventListener('change', () => {
       let v = read();
       if (!Number.isFinite(v)) return;
+      if (snap) { v = Math.round(v / step) * step; input.value = fmt(v); }
       if (min != null && v < min) { v = min; input.value = fmt(v); }
       onChange(v);
     });

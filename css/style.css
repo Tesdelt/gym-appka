@@ -755,7 +755,7 @@ input[type="date"].input { min-height: var(--tap); line-height: var(--tap); }
 .wprog-slot.is-current { height: 16px; background: var(--accent); box-shadow: 0 0 0 1px #E0485C; animation: wl-glow 0.7s ease-in-out infinite alternate; }
 .wprog-slot.is-current .wprog-fill { background: linear-gradient(180deg, #FF7084 0%, #E0223A 35%, #A3101F 70%, #5A0712 100%); animation: wl-pulse 0.7s ease-in-out infinite alternate; }
 .wprog-slot.is-current .wl-wave { animation-duration: 0.5s; }
-.wprog-slot.is-current .wl-bubbles { animation-duration: 0.35s; }
+.wprog-slot.is-current .wl-bubbles { animation-duration: 6.9s; }
 @keyframes wl-glow { to { box-shadow: 0 0 0 1px #FF5A6E, 0 0 10px 1px rgba(224, 34, 58, 0.75); } }
 @keyframes wl-pulse { from { filter: brightness(0.9) saturate(1.1); } to { filter: brightness(1.25) saturate(1.3); } }
 
@@ -768,20 +768,14 @@ input[type="date"].input { min-height: var(--tap); line-height: var(--tap); }
   animation: wl-flow 0.9s linear infinite;
 }
 .wl-bubbles {
-  background:
-    radial-gradient(circle at 25% 60%, rgba(0, 0, 0, 0.75) 0 1.6px, transparent 2.2px) 0 0 / 23px 100% repeat-x,
-    radial-gradient(circle at 70% 35%, rgba(0, 0, 0, 0.6) 0 1.1px, transparent 1.7px) 0 0 / 46px 100% repeat-x;
-  animation: wl-bubbles 0.55s linear infinite;
+  background: var(--bubbles) 0 50% / 900px 16px repeat-x;
+  animation: wl-bubbles 10.7s linear infinite;
 }
 .wprog-slot.is-pr .wl-wave { background:
     repeating-linear-gradient(110deg, transparent 0 9px, rgba(255, 250, 220, 0.6) 9px 13px, transparent 13px 20px, rgba(80, 50, 0, 0.3) 20px 24px, transparent 24px 30px); }
 .wprog-slot:not(.is-done):not(.is-current) .wl-wave, .wprog-slot:not(.is-done):not(.is-current) .wl-bubbles { animation-play-state: paused; opacity: 0; }
 @keyframes wl-flow { to { transform: translateX(-30px); } }
-@keyframes wl-bubbles {
-  0% { transform: translate(0, 1.5px); }
-  50% { transform: translate(-23px, -1.5px); }
-  100% { transform: translate(-46px, 1.5px); }
-}
+@keyframes wl-bubbles { to { transform: translateX(-900px); } }
 @media (prefers-reduced-motion: reduce) { .wl-wave, .wl-bubbles, .wprog-slot.is-current, .wprog-slot.is-current .wprog-fill { animation: none !important; } }
 .wprog-ex.is-skipped .wprog-slot { background: repeating-linear-gradient(90deg, var(--border) 0 3px, transparent 3px 6px); }
 /* místo pro vyčnívající kulaté tlačítko Trénink */
@@ -825,17 +819,17 @@ input[type="date"].input { min-height: var(--tap); line-height: var(--tap); }
 .countdown-btn {
   --left: 1;
   position: relative; flex: none; align-self: center;
-  width: 84px; height: 84px; border-radius: 50%; padding: 0;
+  width: 124px; height: 124px; border-radius: 50%; padding: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
   border: 0; color: #ECEAE6; cursor: pointer;
   background: conic-gradient(#E0485C calc(var(--left) * 360deg), #3A0A12 0);
   transition: transform 90ms var(--ease-out);
 }
-.countdown-btn::before { content: ''; position: absolute; inset: 5px; border-radius: 50%; background: var(--accent); }
+.countdown-btn::before { content: ''; position: absolute; inset: 7px; border-radius: 50%; background: var(--accent); }
 .countdown-btn:active { transform: scale(0.95); }
 .countdown-btn > span { position: relative; }
-.cd-big { font-family: var(--font-head); font-weight: 800; font-size: 28px; line-height: 1; letter-spacing: 0.02em; }
-.cd-small { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.85; }
+.cd-big { font-family: var(--font-head); font-weight: 800; font-size: 44px; line-height: 1; letter-spacing: 0.02em; }
+.cd-small { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.85; }
 .countdown-btn.is-running::before { background: #9A1426; }
 .countdown-btn.is-paused::before { background: #3A0A12; }
 .countdown-btn.is-final .cd-big { animation: cd-beat 1s ease-out infinite; }

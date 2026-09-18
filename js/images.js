@@ -33,7 +33,10 @@ export async function exerciseImageUrls(exercise) {
     const url = await blobUrl(exercise.photoId);
     if (url) return [url];
   }
-  const urls = await Promise.all((exercise.images ?? []).map(resolveRef));
+  let refs = exercise.images ?? [];
+  // u statických cviků je první fotka příprava, ukazuje se jen držená poloha
+  if (exercise.type === 'time' && refs.length > 1) refs = refs.slice(1);
+  const urls = await Promise.all(refs.map(resolveRef));
   return urls.filter(Boolean);
 }
 
