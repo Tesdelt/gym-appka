@@ -59,6 +59,8 @@ export async function exerciseFromDb(meta) {
     photoId: null,
     source: 'free-exercise-db',
     dbId: meta.id,
+    skill: meta.sk ?? null,
+    level: meta.lv ?? null,
     createdAt: new Date().toISOString(),
   };
 }

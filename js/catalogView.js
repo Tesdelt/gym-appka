@@ -28,8 +28,8 @@ export async function mountCatalog(host, { scrollRoot, onMine, onDb, onInfo = nu
   // cviky z katalogu, které už mám, se ukazují jen v „Moje cviky“
   const ownedDb = new Set(allMine.map((e) => e.dbId).filter(Boolean));
   const labels = (m) => [...(m?.primary ?? []), ...(m?.secondary ?? [])].map((k) => partLabel(k, lang));
-  const mineHay = new Map(mine.map((e) => [e.id, normalize([e.name, e.nameEn, ...(e.aliases ?? []), ...labels(e.muscles)].join(' '))]));
-  const dbHay = new Map(catalog.map((m) => [m.id, normalize([m.nc, m.n, ...labels({ primary: m.p, secondary: m.s })].join(' '))]));
+  const mineHay = new Map(mine.map((e) => [e.id, normalize([e.name, e.nameEn, e.skill ? 'kalistenika calisthenics' : '', ...(e.aliases ?? []), ...labels(e.muscles)].join(' '))]));
+  const dbHay = new Map(catalog.map((m) => [m.id, normalize([m.nc, m.n, m.kw ?? '', ...labels({ primary: m.p, secondary: m.s })].join(' '))]));
 
   const search = el('input', {
     type: 'search', class: 'input search-input', placeholder: t('Hledat cvik nebo partii…'), autocomplete: 'off', value: state.query,

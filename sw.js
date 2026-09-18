@@ -1,6 +1,6 @@
 // Service worker: offline cache. Při každém nasazení zvýšit VERSION
 // a nové soubory doplnit do ASSETS.
-const VERSION = '0.12.1';
+const VERSION = '0.13.0';
 const CACHE = `gym-app-v${VERSION}`;
 
 const ASSETS = [
@@ -61,8 +61,6 @@ const ASSETS = [
   'img/exercises/dip-1.jpg',
   'img/exercises/dumbbell-brachialis-curls-0.jpg',
   'img/exercises/dumbbell-brachialis-curls-1.jpg',
-  'img/exercises/kladka-biceps-curls-0.jpg',
-  'img/exercises/kladka-biceps-curls-1.jpg',
   'img/exercises/kladka-pull-row-0.jpg',
   'img/exercises/kladka-pull-row-1.jpg',
   'img/exercises/kladka-triceps-extension-0.jpg',

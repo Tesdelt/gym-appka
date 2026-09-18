@@ -465,4 +465,6 @@ export const EN = {
   'Později': 'Later',
   'Zálohovat': 'Back up',
   'Záloha hotová': 'Backup done',
+  'Progrese': 'Progression',
+  'nezačato': 'not started',
 };

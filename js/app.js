@@ -1,6 +1,6 @@
 import { addRoute, startRouter } from './router.js';
 import { openDB, requestPersistentStorage } from './db.js';
-import { seedIfEmpty, translateDbExercises, upgradeExerciseData, applyRestRule } from './seed.js';
+import { seedIfEmpty, translateDbExercises, upgradeExerciseData, applyRestRule, fixCableCurl } from './seed.js';
 import { applyTheme } from './theme.js';
 import { transition } from './fx.js';
 import { fillMissingImages } from './catalog.js';
@@ -41,6 +41,7 @@ async function init() {
     await translateDbExercises().catch((err) => console.error(err));
     await upgradeExerciseData().catch((err) => console.error(err));
     await applyRestRule().catch((err) => console.error(err));
+    await fixCableCurl().catch((err) => console.error(err));
   } catch (err) {
     console.error('Databáze se nepodařila otevřít', err);
     viewEl.innerHTML = `<section class="card"><h2 class="card-title">${t('Chyba úložiště')}</h2>

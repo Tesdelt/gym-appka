@@ -970,3 +970,17 @@ input[type="date"].input { min-height: var(--tap); line-height: var(--tap); }
 .backup-banner { border-color: var(--danger); box-shadow: inset 4px 0 0 var(--danger); }
 .backup-banner p { margin: 0 0 10px; }
 .backup-status { margin-bottom: 12px; }
+
+/* ---------- Progrese statických prvků ---------- */
+.progression { list-style: none; margin: 0; padding: 0; position: relative; }
+.prog-step + .prog-step { border-top: 1px solid var(--border); }
+.prog-btn { display: flex; align-items: center; gap: 10px; width: 100%; min-height: var(--tap); padding: 6px 0; border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.prog-dot { flex: none; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: var(--text-2); }
+.prog-name { flex: 1 1 auto; min-width: 0; font-weight: 600; }
+.prog-best { flex: none; font-weight: 700; font-size: 14px; }
+.prog-step.is-below .prog-dot { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+.prog-step.is-current .prog-dot { border-color: #E0485C; background: #E0485C; color: #fff; box-shadow: 0 0 0 3px rgba(224, 72, 92, 0.3); }
+.prog-step.is-current .prog-name { color: var(--text); }
+/* cvik bez fotky: jen nízký pruh místo velkého prázdného rámečku */
+.ex-hero.is-empty { aspect-ratio: auto; height: 84px; }
+.ex-hero.is-empty svg { width: 44px; height: 44px; }

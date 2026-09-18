@@ -37,9 +37,9 @@ export const BUILTIN_EXERCISES = [
     equipment: 'cable',
     perGym: true,
     weightStep: DEFAULT_WEIGHT_STEP,
-    muscles: { primary: ['biceps-brachii'], secondary: ['brachialis', 'wrist-flexors'] },
-    instructions: 'Stoj čelem ke spodní kladce, podhmat, lokty u těla, zdvih k ramenům, pomalé spuštění do natažených paží.',
-    tips: 'Lokty se nesmí posouvat dopředu, nezaklánět se, nahoře krátce zpevnit.',
+    muscles: { primary: ['biceps-brachii'], secondary: ['brachialis'] },
+    instructions: 'Postav se zády ke spodní kladce a uchop rukojeť podhmatem, paže zůstává mírně za tělem, trup lehce předkloněný. Přitáhni rukojeť zespodu vpřed až k rameni, loket drž na místě u boku, pak pomalu spusť zpět za tělo.',
+    tips: 'Pohyb jde jen v lokti, loket se neposouvá dopředu. Dole nech biceps protáhnout, trupem neškubej.',
   },
   {
     id: 'kladka-pull-row',
@@ -201,9 +201,9 @@ export const BUILTIN_EN = {
     tips: 'Do not swing or kick, keep the belt weight close to the body, start every rep from a full hang.',
   },
   'kladka-biceps-curls': {
-    name: 'Cable biceps curl',
-    instructions: 'Stand facing the low pulley, underhand grip, elbows at your sides, curl to the shoulders, lower slowly to straight arms.',
-    tips: 'Do not let the elbows drift forward, do not lean back, squeeze briefly at the top.',
+    name: 'Behind-the-body cable curl',
+    instructions: 'Stand with your back to the low pulley and grip the handle underhand, the arm slightly behind the body and the torso leaning a little forward. Curl the handle from below up to the shoulder, keeping the elbow at your side, then lower slowly back behind the body.',
+    tips: 'Only the elbow moves, it does not drift forward. Let the biceps stretch at the bottom, do not jerk the torso.',
   },
   'kladka-pull-row': {
     name: 'Seated cable row',
@@ -362,4 +362,23 @@ export async function applyRestRule() {
     await put('workouts', w);
   }
   await setMeta('restRuleV1', new Date().toISOString());
+}
+
+// Jednorázově: „Kladka biceps curls“ se cvičí zády ke kladce (zdvih zespodu
+// za tělem). Opraví postup, tipy a partie, pokud je uživatel neměnil, a odebere
+// fotku z databáze, která ukazuje zdvih čelem ke kladce.
+export async function fixCableCurl() {
+  if (await getMeta('cableCurlV1')) return;
+  const { get, put } = await import('./db.js');
+  const ex = await get('exercises', 'kladka-biceps-curls');
+  if (ex) {
+    if (ex.instructions === "Stoj čelem ke spodní kladce, podhmat, lokty u těla, zdvih k ramenům, pomalé spuštění do natažených paží.") ex.instructions = "Postav se zády ke spodní kladce a uchop rukojeť podhmatem, paže zůstává mírně za tělem, trup lehce předkloněný. Přitáhni rukojeť zespodu vpřed až k rameni, loket drž na místě u boku, pak pomalu spusť zpět za tělo.";
+    if (ex.tips === "Lokty se nesmí posouvat dopředu, nezaklánět se, nahoře krátce zpevnit.") ex.tips = "Pohyb jde jen v lokti, loket se neposouvá dopředu. Dole nech biceps protáhnout, trupem neškubej.";
+    const en = BUILTIN_EN['kladka-biceps-curls'];
+    if (!ex.nameEn || ex.nameEn === 'Cable biceps curl') { ex.nameEn = en.name; ex.instructionsEn = en.instructions; ex.tipsEn = en.tips; }
+    ex.muscles = { primary: ['biceps-brachii'], secondary: ['brachialis'] };
+    if ((ex.images ?? []).every((ref) => ref.startsWith('img/exercises/kladka-biceps-curls'))) ex.images = [];
+    await put('exercises', ex);
+  }
+  await setMeta('cableCurlV1', new Date().toISOString());
 }

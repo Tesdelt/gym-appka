@@ -2,7 +2,6 @@
 // Cvik bez vhodného obrázku v databázi tu není a zobrazí zástupný symbol.
 export const BUILTIN_IMAGES = {
   'shyb': ['img/exercises/shyb-0.jpg', 'img/exercises/shyb-1.jpg'],
-  'kladka-biceps-curls': ['img/exercises/kladka-biceps-curls-0.jpg', 'img/exercises/kladka-biceps-curls-1.jpg'],
   'kladka-pull-row': ['img/exercises/kladka-pull-row-0.jpg', 'img/exercises/kladka-pull-row-1.jpg'],
   'dumbbell-brachialis-curls': ['img/exercises/dumbbell-brachialis-curls-0.jpg', 'img/exercises/dumbbell-brachialis-curls-1.jpg'],
   'dip': ['img/exercises/dip-0.jpg', 'img/exercises/dip-1.jpg'],

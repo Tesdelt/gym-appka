@@ -144,6 +144,9 @@ async function renderDetail(container, exercise, extraEl) {
     ]));
   }
 
+  // Progrese statického prvku (kalistenika)
+  if (exercise.skill) stack.append(await progressionCard(exercise.skill, exercise.dbId, records));
+
   // Minule / doporučení / rekord / graf (u kladek podle posilovny)
   const progress = el('section', { class: 'card' });
   stack.append(progress);
@@ -413,6 +416,37 @@ async function renderCatalogItem(container, dbId, extraEl) {
     ]),
   );
   extraEl.append(addBtn);
+  if (meta.sk) stack.append(await progressionCard(meta.sk, meta.id));
   const instructions = await dbInstructions(dbId);
   if (instructions) stack.append(el('section', { class: 'card' }, [el('h3', { class: 'card-title', text: t('Postup') }), el('p', { class: 'prose', text: instructions })]));
+}
+
+// Žebříček úrovní statického prvku: od nejlehčí po plnou verzi. U úrovní,
+// které už mám mezi svými cviky, ukáže nejlepší výdrž.
+async function progressionCard(skill, currentDbId, records = null) {
+  const [catalog, mine] = await Promise.all([loadCatalog().catch(() => []), (await import('../data.js')).listExercises()]);
+  const levels = catalog.filter((m) => m.sk === skill).sort((a, b) => a.lv - b.lv);
+  const owned = new Map(mine.filter((e) => e.dbId).map((e) => [e.dbId, e]));
+  if (!records) {
+    const [done, manual] = await Promise.all([listDoneWorkouts(), listManualRecords()]);
+    records = computeRecords([...done, ...manualAsWorkouts(manual, new Map(mine.map((e) => [e.id, e])))]);
+  }
+  const currentLv = levels.find((m) => m.id === currentDbId)?.lv ?? -1;
+  return el('section', { class: 'card' }, [
+    el('h3', { class: 'card-title', text: t('Progrese') }),
+    el('ol', { class: 'progression' }, levels.map((m) => {
+      const ex = owned.get(m.id);
+      const best = ex ? records.get(ex.id)?.maxSeconds?.value : null;
+      return el('li', { class: `prog-step ${m.id === currentDbId ? 'is-current' : ''} ${m.lv < currentLv ? 'is-below' : ''}` }, [
+        el('button', {
+          type: 'button', class: 'prog-btn',
+          onclick: () => navigate(ex ? `cvik/${encodeURIComponent(ex.id)}` : `cvik/db/${encodeURIComponent(m.id)}`),
+        }, [
+          el('span', { class: 'prog-dot', text: String(m.lv + 1) }),
+          el('span', { class: 'prog-name', text: dbName(m) }),
+          el('span', { class: `prog-best ${best ? 'gold' : 'muted'}`, text: best ? `${best} s` : ex ? '–' : t('nezačato') }),
+        ]),
+      ]);
+    })),
+  ]);
 }
