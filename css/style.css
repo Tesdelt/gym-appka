@@ -222,3 +222,111 @@ button, input, select, textarea { font: inherit; color: inherit; }
   color: var(--text);
   border-top-color: var(--accent);
 }
+
+/* ---------- Seznamy ---------- */
+.list { list-style: none; margin: 0 0 12px; padding: 0; }
+.list-cards { margin: 0; }
+.list-cards > li + li { margin-top: 8px; }
+.list-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--tap);
+  border-top: 1px solid var(--border);
+}
+.list-row:first-child { border-top: 0; }
+.list-cards .list-row { border-top: 1px solid var(--border); }
+.list-row-stacked { flex-direction: column; align-items: stretch; gap: 2px; padding: 10px 0; }
+.list-cards .list-row-stacked { padding: 12px var(--gutter); }
+.list-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-weight: 600;
+  text-align: left;
+  min-height: inherit;
+  cursor: pointer;
+}
+button.list-main { min-height: var(--tap); }
+.list-row-stacked .list-main { min-height: 0; }
+.btn-icon { min-width: 40px; padding: 0; font-size: 22px; line-height: 1; }
+.btn-danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+/* ---------- Rozbalovací sekce ---------- */
+.accordion { border-top: 1px solid var(--border); }
+.accordion summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  min-height: var(--tap);
+  padding: 12px 0;
+  cursor: pointer;
+  list-style: none;
+}
+.accordion summary::-webkit-details-marker { display: none; }
+.accordion summary::after { content: '+'; color: var(--text-2); font-size: 20px; margin-left: auto; }
+.accordion[open] summary::after { content: '−'; }
+.accordion-title { font-weight: 600; }
+.accordion .list { margin: 0 0 12px; padding-left: 12px; border-left: 2px solid var(--border); }
+.accordion .list-row { border-top: 0; padding: 6px 0; }
+
+/* ---------- Formuláře ---------- */
+.input {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.input:focus { outline: none; border-color: var(--accent); }
+.field-label { display: block; margin-bottom: 6px; color: var(--text-2); font-size: 15px; }
+
+/* ---------- Dialogy ---------- */
+.dialog {
+  width: min(92vw, 420px);
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--text);
+}
+.dialog::backdrop { background: rgba(0, 0, 0, 0.7); }
+.dialog-body { padding: var(--gutter); }
+.dialog-title {
+  margin: 0 0 12px;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: 0.03em;
+}
+.dialog-body p { margin: 0 0 12px; }
+.dialog-actions { display: flex; gap: 8px; margin-top: 16px; }
+.dialog-actions .btn { flex: 1 1 0; }
+
+/* ---------- Oznámení ---------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--safe-bottom) + 76px);
+  transform: translate(-50%, 8px);
+  padding: 10px 16px;
+  background: var(--text);
+  color: var(--bg);
+  font-weight: 600;
+  font-size: 15px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s, transform 0.15s;
+  z-index: 10;
+}
+.toast.is-visible { opacity: 1; transform: translate(-50%, 0); }

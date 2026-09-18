@@ -1,4 +1,8 @@
-// Karta „Kontrola instalace“: ověření, že appka běží z plochy a funguje offline.
+// Karta „Kontrola instalace“: ověření, že appka běží z plochy, funguje offline
+// a má trvalé úložiště.
+
+import { storageEstimate, count } from './db.js';
+import { formatBytes } from './ui.js';
 
 export function isStandalone() {
   return navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
@@ -19,6 +23,9 @@ export function renderDiagnostics(container) {
       <div class="kv-row"><dt>Režim</dt><dd data-k="mode">…</dd></div>
       <div class="kv-row"><dt>Offline</dt><dd data-k="offline">…</dd></div>
       <div class="kv-row"><dt>Připojení</dt><dd data-k="net">…</dd></div>
+      <div class="kv-row"><dt>Trvalé úložiště</dt><dd data-k="persist">…</dd></div>
+      <div class="kv-row"><dt>Obsazeno</dt><dd data-k="usage">…</dd></div>
+      <div class="kv-row"><dt>Data</dt><dd data-k="data">…</dd></div>
       <div class="kv-row"><dt>Verze</dt><dd data-k="version">…</dd></div>
     </dl>`;
   container.append(card);
@@ -37,6 +44,20 @@ export function renderDiagnostics(container) {
     const controlled = 'serviceWorker' in navigator && Boolean(navigator.serviceWorker.controller);
     set('offline', version && controlled ? 'Připraveno' : version ? 'Připraveno po dalším spuštění' : 'Nepřipraveno', Boolean(version));
     set('version', version ?? '–');
+
+    let persisted = null;
+    try { persisted = navigator.storage?.persisted ? await navigator.storage.persisted() : null; } catch { /* nepodporováno */ }
+    set('persist', persisted === true ? 'Ano' : persisted === false ? 'Ne' : 'Nezjištěno', persisted !== false);
+
+    const est = await storageEstimate();
+    set('usage', est ? `${formatBytes(est.usage)} z ${formatBytes(est.quota)}` : '–');
+
+    try {
+      const [gyms, exercises, templates, workouts] = await Promise.all(['gyms', 'exercises', 'templates', 'workouts'].map(count));
+      set('data', `${gyms} posil., ${exercises} cviků, ${templates} šablony, ${workouts} trén.`);
+    } catch {
+      set('data', 'Databáze nedostupná', false);
+    }
   };
 
   refresh();

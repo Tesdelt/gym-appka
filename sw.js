@@ -1,21 +1,38 @@
 // Service worker: offline cache. Při každém nasazení zvýšit VERSION
 // a nové soubory doplnit do ASSETS.
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 const CACHE = `gym-app-v${VERSION}`;
 
 const ASSETS = [
   './',
   'index.html',
   'manifest.webmanifest',
+  'css/fonts.css',
   'css/style.css',
   'js/app.js',
   'js/router.js',
+  'js/db.js',
+  'js/seed.js',
+  'js/data.js',
+  'js/ui.js',
   'js/diagnostics.js',
   'js/views/home.js',
   'js/views/stats.js',
   'js/views/goals.js',
   'js/views/exercises.js',
   'js/views/settings.js',
+  'fonts/barlow-400-latin-ext.woff2',
+  'fonts/barlow-400-latin.woff2',
+  'fonts/barlow-500-latin-ext.woff2',
+  'fonts/barlow-500-latin.woff2',
+  'fonts/barlow-600-latin-ext.woff2',
+  'fonts/barlow-600-latin.woff2',
+  'fonts/barlow-700-latin-ext.woff2',
+  'fonts/barlow-700-latin.woff2',
+  'fonts/big-shoulders-display-700-latin-ext.woff2',
+  'fonts/big-shoulders-display-700-latin.woff2',
+  'fonts/big-shoulders-display-800-latin-ext.woff2',
+  'fonts/big-shoulders-display-800-latin.woff2',
   'icons/apple-touch-icon.png',
   'icons/icon-192.png',
   'icons/icon-512.png',
