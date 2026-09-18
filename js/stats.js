@@ -122,3 +122,66 @@ export function frequency(done, weeks = 12, now = new Date()) {
   const recent = buckets.slice(-span).reduce((a, b) => a + b.count, 0);
   return { week, month, avg: recent / span, buckets };
 }
+
+// Frekvence za období: 'week' (7 dní po dnech), 'month' (30 dní po dnech),
+// 'year' (12 měsíců), 'all' (po měsících, u dlouhé historie po letech).
+// Každý sloupec má části podle typu tréninku (templateId).
+export function frequencyRange(done, range, now = new Date()) {
+  const day = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+  const today = day(now);
+  let buckets = [];
+  let unit = 'day';
+  if (range === 'week' || range === 'month') {
+    const n = range === 'week' ? 7 : 30;
+    for (let i = n - 1; i >= 0; i--) {
+      const from = new Date(today); from.setDate(from.getDate() - i);
+      const to = new Date(from); to.setDate(to.getDate() + 1);
+      buckets.push({ from, to });
+    }
+  } else {
+    unit = 'month';
+    let start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+    if (range === 'all') {
+      const first = done.length ? new Date(done[done.length - 1].startedAt) : now;
+      start = new Date(first.getFullYear(), first.getMonth(), 1);
+      const months = (now.getFullYear() - start.getFullYear()) * 12 + now.getMonth() - start.getMonth() + 1;
+      if (months > 24) { unit = 'year'; start = new Date(start.getFullYear(), 0, 1); }
+    }
+    for (let d = new Date(start); d <= now;) {
+      const from = new Date(d);
+      if (unit === 'year') d = new Date(d.getFullYear() + 1, 0, 1);
+      else d = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+      buckets.push({ from, to: new Date(d) });
+    }
+  }
+  buckets = buckets.map((b) => ({ ...b, byTemplate: new Map(), count: 0 }));
+  const rangeFrom = buckets[0].from;
+  let seconds = 0;
+  let count = 0;
+  for (const w of done) {
+    const t = new Date(w.startedAt);
+    if (t < rangeFrom) continue;
+    const b = buckets.find((x) => t >= x.from && t < x.to);
+    if (!b) continue;
+    b.count++;
+    b.byTemplate.set(w.templateId, (b.byTemplate.get(w.templateId) ?? 0) + 1);
+    count++;
+    if (w.endedAt) seconds += Math.max(0, (new Date(w.endedAt) - t) / 1000);
+  }
+  const days = Math.max(1, Math.round((today - day(rangeFrom)) / 86400000) + 1);
+  return { buckets, unit, count, perWeek: count / (days / 7), hours: seconds / 3600 };
+}
+
+// Kolikrát byl cvik odcvičen (počet tréninků) – pro řazení podle četnosti
+export function exerciseUsage(done) {
+  const out = new Map();
+  for (const w of done) {
+    const seen = new Set();
+    for (const e of w.exercises) {
+      if (seen.has(e.exerciseId) || !slotsOf(e).some((s) => s.done)) continue;
+      seen.add(e.exerciseId);
+      out.set(e.exerciseId, (out.get(e.exerciseId) ?? 0) + 1);
+    }
+  }
+  return out;
+}

@@ -4,18 +4,18 @@
 //        #/statistiky/mira/<key>    tělesná míra: graf, záznamy
 //        #/statistiky/cvik/<id>     výkon cviku: graf, rekordy, ruční záznamy
 
-import { el, openDialog, confirmDialog, toast, stepField, formatWeight, formatValues, dateShort, plural } from '../ui.js';
+import { el, openDialog, confirmDialog, toast, stepField, formatWeight, formatValues, dateShort, plural, normalize } from '../ui.js';
 import { navigate } from '../router.js';
 import {
   listMeasureKinds, saveMeasureKinds, listMeasurements, addMeasurement, deleteMeasurement,
-  exerciseMap, listGyms, getLastGymId, kindName,
+  exerciseMap, listGyms, getLastGymId, kindName, listTemplates, templateColor,
 } from '../data.js';
 import { listDoneWorkouts } from '../workout.js';
 import { computeRecords, recordKey } from '../records.js';
 import { rangeChart, barChart } from '../chart.js';
 import {
   listManualRecords, addManualRecord, deleteManualRecord, manualAsWorkouts, exercisePoints, exerciseFormat,
-  exerciseChartTitle, frequency,
+  exerciseChartTitle, frequencyRange, exerciseUsage,
 } from '../stats.js';
 import { recordText } from './exercise.js';
 import { countUp } from '../fx.js';
@@ -52,28 +52,59 @@ const toIso = (dateStr) => {
 };
 
 // ---------- Přehled ----------
+// Zvolené období frekvence a hledání v rekordech (pamatuje se mezi obrazovkami)
+const view = { range: 'month', query: '' };
+
 async function renderOverview(container) {
-  const [done, kinds, measurements, exercises, manual, gyms] = await Promise.all([
-    listDoneWorkouts(), listMeasureKinds(), listMeasurements(), exerciseMap(), listManualRecords(), listGyms(),
+  const [done, kinds, measurements, exercises, manual, gyms, templates] = await Promise.all([
+    listDoneWorkouts(), listMeasureKinds(), listMeasurements(), exerciseMap(), listManualRecords(), listGyms(), listTemplates(),
   ]);
   const stack = el('div', { class: 'stack' });
   container.append(stack);
 
-  // Frekvence
-  const f = frequency(done);
-  const monthFmt = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'numeric' });
-  stack.append(el('section', { class: 'card' }, [
-    el('h2', { class: 'card-title', text: t('Frekvence tréninků') }),
-    el('div', { class: 'stat-tiles' }, [
-      tile(t('Tento týden'), String(f.week)),
-      tile(t('Tento měsíc'), String(f.month)),
-      tile(t('Průměr / týden'), num(f.avg, 1)),
-    ]),
-    el('h4', { class: 'sub-title', text: t('Posledních 12 týdnů') }),
-    barChart(f.buckets.map((b, i) => ({ value: b.count, current: i === f.buckets.length - 1, from: b.from })), {
-      label: (b, i) => (i % 3 === 0 || i === 11 ? monthFmt.format(b.from) : ''),
-    }),
-  ]));
+  // Frekvence za zvolené období, sloupce v barvách typů tréninku
+  const freqCard = el('section', { class: 'card' });
+  stack.append(freqCard);
+  const tplColor = (id) => templateColor(templates.find((tpl) => tpl.id === id)?.color) ?? '#7A1C2A';
+  const tplName = (id) => templates.find((tpl) => tpl.id === id)?.name ?? t('Ostatní');
+  const drawFreq = () => {
+    const f = frequencyRange(done, view.range);
+    const dayFmt = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'numeric' });
+    const wdFmt = new Intl.DateTimeFormat(locale, { weekday: 'short' });
+    const monFmt = new Intl.DateTimeFormat(locale, { month: 'short' });
+    const n = f.buckets.length;
+    const label = (bk, i) => {
+      if (f.unit === 'year') return String(bk.from.getFullYear());
+      if (f.unit === 'month') return n <= 12 || i % Math.ceil(n / 12) === 0 ? monFmt.format(bk.from).replace('.', '') : '';
+      if (view.range === 'week') return wdFmt.format(bk.from);
+      return (n - 1 - i) % 7 === 0 ? dayFmt.format(bk.from) : '';
+    };
+    const used = new Map();
+    for (const bk of f.buckets) for (const [id, c] of bk.byTemplate) used.set(id, (used.get(id) ?? 0) + c);
+    const order = [...used.keys()].sort((x, y) => (templates.findIndex((tpl) => tpl.id === x) - templates.findIndex((tpl) => tpl.id === y)));
+    freqCard.replaceChildren(
+      el('h2', { class: 'card-title', text: t('Frekvence tréninků') }),
+      el('div', { class: 'segmented range-seg' }, [['week', t('Týden')], ['month', t('Měsíc')], ['year', t('Rok')], ['all', t('Vše')]].map(([key, text]) => el('button', {
+        type: 'button', class: `seg ${view.range === key ? 'is-selected' : ''}`, text,
+        onclick: () => { view.range = key; drawFreq(); },
+      }))),
+      el('div', { class: 'stat-tiles' }, [
+        tile(t('Tréninků'), String(f.count)),
+        tile(t('Průměr / týden'), num(f.perWeek, 1)),
+        tile(t('Hodin'), num(f.hours, 1)),
+      ]),
+      barChart(f.buckets.map((bk) => ({
+        value: bk.count,
+        from: bk.from,
+        segments: order.filter((id) => bk.byTemplate.has(id)).map((id) => ({ value: bk.byTemplate.get(id), color: tplColor(id) })),
+      })), { label, showValues: n <= 12 }),
+      order.length ? el('div', { class: 'freq-legend' }, order.map((id) => el('span', { class: 'freq-key' }, [
+        el('span', { class: 'swatch', style: `background: ${tplColor(id)}` }),
+        el('span', { text: `${tplName(id)} ${used.get(id)}` }),
+      ]))) : el('p', { class: 'muted small', text: t('V tomto období žádný trénink.') }),
+    );
+  };
+  drawFreq();
 
   // Tělesné míry
   const bodyRows = kinds.map((k) => {
@@ -97,28 +128,42 @@ async function renderOverview(container) {
     ]),
   ]));
 
-  // Osobní rekordy
+  // Osobní rekordy: řazené podle toho, jak často cvik cvičím, s hledáním
   const sessions = [...done, ...manualAsWorkouts(manual, exercises)];
   const records = computeRecords(sessions);
-  const rows = [];
-  const sorted = [...exercises.values()].sort((a, b) => exName(a).localeCompare(exName(b), lang));
-  for (const ex of sorted) {
+  const usage = exerciseUsage(done);
+  const items = [];
+  for (const ex of exercises.values()) {
     const keys = ex.perGym ? gyms.map((g) => ({ gym: g, key: recordKey({ exerciseId: ex.id, perGym: true }, g.id) })) : [{ gym: null, key: ex.id }];
     for (const { gym, key } of keys) {
-      const rec = records.get(key);
-      const text = recordText(ex, rec);
+      const text = recordText(ex, records.get(key));
       if (text === '–') continue;
-      rows.push(el('li', { class: 'list-row' }, [
-        el('button', { type: 'button', class: 'list-main stat-row', onclick: () => navigate(`statistiky/cvik/${encodeURIComponent(ex.id)}`) }, [
-          el('span', {}, [el('span', { class: 'block', text: exName(ex) }), gym && gyms.length > 1 ? el('span', { class: 'muted small block', text: gym.name }) : null]),
-          el('strong', { class: 'gold stat-value', text: text }),
-        ]),
-      ]));
+      items.push({ ex, gym, text, uses: usage.get(ex.id) ?? 0, hay: normalize([ex.name, ex.nameEn, ...(ex.aliases ?? []), gym?.name].join(' ')) });
     }
   }
+  items.sort((x, y) => y.uses - x.uses || exName(x.ex).localeCompare(exName(y.ex), lang));
+  const recList = el('ul', { class: 'list' });
+  const drawRecords = () => {
+    const words = normalize(view.query).trim().split(/\s+/).filter(Boolean);
+    const shown = items.filter((it) => words.every((w) => it.hay.includes(w)));
+    recList.replaceChildren(...shown.map(({ ex, gym, text, uses }) => el('li', { class: 'list-row' }, [
+      el('button', { type: 'button', class: 'list-main stat-row', onclick: () => navigate(`statistiky/cvik/${encodeURIComponent(ex.id)}`) }, [
+        el('span', {}, [
+          el('span', { class: 'block', text: exName(ex) }),
+          el('span', { class: 'muted small block', text: [gym && gyms.length > 1 ? gym.name : null, plural(uses, ['trénink', 'tréninky', 'tréninků'], ['workout', 'workouts'])].filter(Boolean).join(' · ') }),
+        ]),
+        el('strong', { class: 'gold stat-value', text }),
+      ]),
+    ])));
+    if (!shown.length) recList.append(el('li', { class: 'muted small', text: t('Nic nenalezeno.') }));
+  };
   stack.append(el('section', { class: 'card' }, [
     el('h2', { class: 'card-title', text: t('Osobní rekordy') }),
-    rows.length ? el('ul', { class: 'list' }, rows) : el('p', { class: 'muted small', text: t('Zatím žádné. Plní se z tréninků, nebo zapiš ruční záznam.') }),
+    items.length ? el('input', {
+      type: 'search', class: 'input rec-search', placeholder: t('Hledat cvik…'), autocomplete: 'off', value: view.query,
+      oninput: (e) => { view.query = e.target.value; drawRecords(); },
+    }) : null,
+    items.length ? recList : el('p', { class: 'muted small', text: t('Zatím žádné. Plní se z tréninků, nebo zapiš ruční záznam.') }),
     el('button', {
       type: 'button', class: 'btn', text: t('+ Ruční záznam výkonu'),
       onclick: async () => {
@@ -128,6 +173,7 @@ async function renderOverview(container) {
       },
     }),
   ]));
+  drawRecords();
 
   function rerender() {
     container.replaceChildren();

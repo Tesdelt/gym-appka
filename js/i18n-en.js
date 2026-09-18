@@ -467,4 +467,11 @@ export const EN = {
   'Záloha hotová': 'Backup done',
   'Progrese': 'Progression',
   'nezačato': 'not started',
+  'Ostatní': 'Other',
+  'Týden': 'Week',
+  'Měsíc': 'Month',
+  'Rok': 'Year',
+  'Tréninků': 'Workouts',
+  'Hodin': 'Hours',
+  'V tomto období žádný trénink.': 'No workouts in this period.',
 };

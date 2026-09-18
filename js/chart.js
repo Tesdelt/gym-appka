@@ -106,7 +106,7 @@ export function rangeChart(points, options = {}) {
 }
 
 // Sloupcový graf (frekvence po týdnech)
-export function barChart(bars, { height = 110, label = (b) => '' } = {}) {
+export function barChart(bars, { height = 110, label = (b) => '', showValues = true } = {}) {
   const W = 340;
   const H = height;
   const pad = { l: 6, r: 6, t: 16, b: 20 };
@@ -118,8 +118,20 @@ export function barChart(bars, { height = 110, label = (b) => '' } = {}) {
     const h = (b.value / max) * (H - pad.t - pad.b);
     const x = pad.l + i * bw + bw * 0.18;
     if (b.value > 0) {
-      svg.append(node('rect', { x, y: H - pad.b - h, width: bw * 0.64, height: h, class: b.current ? 'chart-bar is-current' : 'chart-bar' }));
-      svg.append(node('text', { x: x + bw * 0.32, y: H - pad.b - h - 4, 'text-anchor': 'middle', class: 'chart-label' }, String(b.value)));
+      if (b.segments?.length) {
+        // skládaný sloupec: každý typ tréninku svou barvou, zdola nahoru
+        const g = node('g', { class: 'chart-bar' });
+        let y = H - pad.b;
+        for (const seg of b.segments) {
+          const sh = (seg.value / max) * (H - pad.t - pad.b);
+          y -= sh;
+          g.append(node('rect', { x, y, width: bw * 0.64, height: Math.max(0, sh - 1), fill: seg.color }));
+        }
+        svg.append(g);
+      } else {
+        svg.append(node('rect', { x, y: H - pad.b - h, width: bw * 0.64, height: h, class: b.current ? 'chart-bar is-current' : 'chart-bar' }));
+      }
+      if (showValues) svg.append(node('text', { x: x + bw * 0.32, y: H - pad.b - h - 4, 'text-anchor': 'middle', class: 'chart-label' }, String(b.value)));
     }
     const text = label(b, i);
     if (text) svg.append(node('text', { x: x + bw * 0.32, y: H - 6, 'text-anchor': 'middle', class: 'chart-label' }, text));

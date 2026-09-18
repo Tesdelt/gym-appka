@@ -984,3 +984,10 @@ input[type="date"].input { min-height: var(--tap); line-height: var(--tap); }
 /* cvik bez fotky: jen nízký pruh místo velkého prázdného rámečku */
 .ex-hero.is-empty { aspect-ratio: auto; height: 84px; }
 .ex-hero.is-empty svg { width: 44px; height: 44px; }
+
+/* ---------- Frekvence: legenda typů tréninku ---------- */
+.freq-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 13px; }
+.freq-key { display: inline-flex; align-items: center; gap: 6px; }
+.freq-key .swatch { width: 14px; height: 14px; border: 0; }
+.stat-tiles { margin-bottom: 10px; }
+.rec-search { margin-bottom: 6px; }
