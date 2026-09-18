@@ -165,19 +165,39 @@ export function isHistoryFile(data) {
 
 export async function importHistory(data) {
   const db = await openDB();
-  const [exIds, wIds] = await Promise.all([
-    getAll('exercises').then((l) => new Set(l.map((e) => e.id))),
-    getAll('workouts').then((l) => new Set(l.map((w) => w.id))),
-  ]);
-  const exercises = (data.exercises ?? []).filter((e) => !exIds.has(e.id));
-  const workouts = data.workouts.filter((w) => !wIds.has(w.id));
+  const [existingEx, existingW, gyms] = await Promise.all([getAll('exercises'), getAll('workouts'), getAll('gyms')]);
+  const norm = (x) => String(x ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  const byId = new Map(existingEx.map((e) => [e.id, e]));
+  const byDb = new Map(existingEx.filter((e) => e.dbId).map((e) => [e.dbId, e]));
+  const byName = new Map(existingEx.map((e) => [norm(e.name), e]));
+  const wIds = new Set(existingW.map((w) => w.id));
+
+  // cvik, který už v appce je (stejné id, stejný cvik z katalogu nebo stejný název), se nepřidává znovu
+  const remap = new Map();
+  const newExercises = [];
+  for (const ex of data.exercises ?? []) {
+    const same = byId.get(ex.id) ?? (ex.dbId && byDb.get(ex.dbId)) ?? byName.get(norm(ex.name));
+    if (same) remap.set(ex.id, same);
+    else newExercises.push(ex);
+  }
+  const workouts = data.workouts.filter((w) => !wIds.has(w.id)).map((w) => {
+    const gym = gyms.find((g) => g.id === w.gymId);
+    return {
+      ...w,
+      gymName: gym && w.gymName === data.defaultGymName ? gym.name : w.gymName,
+      exercises: w.exercises.map((e) => {
+        const target = remap.get(e.exerciseId);
+        return target ? { ...e, exerciseId: target.id, name: target.name } : e;
+      }),
+    };
+  });
   await new Promise((resolve, reject) => {
     const tx = db.transaction(['exercises', 'workouts'], 'readwrite');
-    exercises.forEach((e) => tx.objectStore('exercises').put(e));
+    newExercises.forEach((e) => tx.objectStore('exercises').put(e));
     workouts.forEach((w) => tx.objectStore('workouts').put(w));
     tx.oncomplete = resolve;
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error ?? new Error('Import zrušen'));
   });
-  return { exercises: exercises.length, workouts: workouts.length, skipped: data.workouts.length - workouts.length };
+  return { exercises: newExercises.length, workouts: workouts.length, skipped: data.workouts.length - workouts.length };
 }
