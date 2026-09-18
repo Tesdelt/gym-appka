@@ -451,8 +451,11 @@ function progressBar(onJump) {
       const sig = workout.exercises.map((e) => `${e.uid}:${slotsOf(e).length}`).join('|');
       if (sig !== signature) {
         signature = sig;
-        slotEls = workout.exercises.map((entry) => slotsOf(entry).map(() => el('div', { class: 'wprog-slot' }, [el('div', { class: 'wprog-fill' })])));
+        slotEls = workout.exercises.map((entry) => slotsOf(entry).map(() => el('div', { class: 'wprog-slot' }, [
+          el('div', { class: 'wprog-fill' }, [el('div', { class: 'wl-wave' }), el('div', { class: 'wl-bubbles' })]),
+        ])));
         root.replaceChildren(...slotEls.map((slots, i) => el('div', { class: 'wprog-ex', style: `flex-grow: ${slots.length}` }, slots)));
+        requestAnimationFrame(alignLiquid);
       }
       let done = 0;
       let total = 0;
@@ -470,4 +473,23 @@ function progressBar(onJump) {
       root.setAttribute('aria-valuenow', total ? Math.round((done / total) * 100) : 0);
     },
   };
+
+  // Tekutina: vzor ve všech sériích tvoří jeden souvislý proud (každá vrstva
+  // je posunutá o polohu své série) a všechny běží ve stejné fázi.
+  function alignLiquid() {
+    if (!root.isConnected) return;
+    const base = root.getBoundingClientRect();
+    const width = Math.ceil(base.width);
+    const now = performance.now() / 1000;
+    for (const node of root.querySelectorAll('.wprog-slot')) {
+      const off = node.getBoundingClientRect().left - base.left;
+      for (const layer of node.querySelectorAll('.wl-wave, .wl-bubbles')) {
+        layer.style.left = `${-off}px`;
+        layer.style.width = `${width + 60}px`;
+        const dur = layer.classList.contains('wl-wave') ? 2.6 : 1.7;
+        layer.style.animationDelay = `${-(now % dur)}s`;
+      }
+    }
+  }
+  window.addEventListener('resize', () => requestAnimationFrame(alignLiquid));
 }

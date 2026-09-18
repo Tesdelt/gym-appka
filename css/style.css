@@ -230,25 +230,36 @@ button, input, select, textarea { font: inherit; color: inherit; }
   stroke-linejoin: miter;
 }
 
-/* každá záložka jako samostatné tlačítko, aktuální zčervená */
-.tab { background: var(--bg); border: 1px solid var(--border); }
+/* záložky navazují na sebe bez mezer, přes celou výšku lišty až ke krajům;
+   oddělené jen tenkou čárou, aktuální zčervená */
+.tabbar { padding-bottom: 0; background: var(--bg); }
+.tab {
+  margin: 0;
+  padding: 6px 2px calc(6px + var(--safe-bottom));
+  background: var(--surface);
+  border: 0;
+  border-right: 1px solid var(--border);
+}
+.tab:last-child { border-right: 0; }
 .tab.is-active { color: var(--tab-active); }
 
-/* prostřední kulaté tlačítko Trénink: velké, zasazené do lišty, nápis uvnitř */
-.tab-center { position: relative; flex: 1.2 1 0; margin: 0 2px; padding: 0; justify-content: flex-start; border: 0; background: none; }
+/* prostřední kulaté tlačítko Trénink: větší než záložka, lehce zasahuje do sousedních */
+.tab-center { position: relative; z-index: 2; flex: 1 1 0; padding-top: 0; justify-content: flex-start; overflow: visible; }
 .tab-center-circle {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
-  width: 78px; height: 78px; margin-top: -16px;
+  flex: none;
+  width: 86px; height: 86px; margin: -18px -8px 0;
   border-radius: 50%;
-  background: var(--bg);
+  background: var(--surface);
   border: 2px solid var(--tab-active);
-  color: var(--tab-active);
+  color: var(--text-2);
   font-size: 11px; font-weight: 700; letter-spacing: 0.03em;
   box-shadow: 0 -3px 12px rgba(0, 0, 0, 0.4);
   transition: background-color 200ms, color 200ms;
 }
-.tab-center-circle svg { width: 32px; height: 32px; stroke-width: 2; }
+.tab-center-circle svg { width: 34px; height: 34px; stroke-width: 2; color: var(--tab-active); }
 .tab-center.is-active .tab-center-circle { background: var(--accent); border-color: #C23447; color: #ECEAE6; }
+.tab-center.is-active .tab-center-circle svg { color: #ECEAE6; }
 .tab-center:active .tab-center-circle { transform: scale(0.95); }
 
 /* ---------- Seznamy ---------- */
@@ -636,7 +647,7 @@ input[type="date"].input { min-height: var(--tap); line-height: var(--tap); }
 .seg:active, .tab:active { transform: scale(0.94); }
 .tab svg { transition: transform 200ms var(--ease-out); }
 .tab.is-active:not(.tab-center) svg { transform: scale(1.06); }
-.tab-center.is-active svg { transform: none; }
+.tab-center svg { transform: none !important; }
 .tab { transition: color 200ms, border-color 200ms; }
 .stepper-value { overflow: hidden; }
 
@@ -735,11 +746,42 @@ input[type="date"].input { min-height: var(--tap); line-height: var(--tap); }
 .wprog-ex { display: flex; align-items: center; gap: 2px; flex-basis: 0; min-width: 0; height: 100%; }
 .wprog-ex + .wprog-ex { margin-left: 4px; padding-left: 4px; background: linear-gradient(var(--text-2), var(--text-2)) left center / 2px 14px no-repeat; }
 .wprog-slot { position: relative; flex: 1 1 0; height: 5px; background: var(--border); overflow: hidden; transition: height 200ms var(--ease-out); }
-.wprog-fill { position: absolute; inset: 0; background: #C23447; transform: scaleX(0); transform-origin: left; transition: transform 420ms var(--ease-out); }
+.wprog-slot.is-done { height: 8px; }
+.wprog-fill {
+  position: absolute; inset: 0; overflow: hidden;
+  background: linear-gradient(180deg, #E0485C 0%, #B0141E 55%, #7A0E1B 100%);
+  transform: scaleX(0); transform-origin: left;
+  transition: transform 420ms var(--ease-out);
+}
 .wprog-slot.is-done .wprog-fill { transform: scaleX(1); }
-.wprog-slot.is-current { height: 9px; background: var(--accent); box-shadow: 0 0 0 1px #C23447; }
-.wprog-slot.is-pr .wprog-fill { background: linear-gradient(90deg, #C8A04A, #E8C46E, #C8A04A); }
+.wprog-slot.is-current { height: 10px; background: var(--accent); box-shadow: 0 0 0 1px #C23447; }
+.wprog-slot.is-pr .wprog-fill { background: linear-gradient(180deg, #F2D58A 0%, #C8A04A 55%, #8C6A1E 100%); }
 .wprog-slot.is-pr { box-shadow: 0 0 6px rgba(200, 160, 74, 0.7); }
+
+/* tekutina: proudí doleva od aktuální pozice, s bublinkami */
+.wl-wave, .wl-bubbles { position: absolute; top: 0; bottom: 0; left: 0; will-change: transform; pointer-events: none; }
+.wl-wave {
+  background:
+    repeating-linear-gradient(105deg, transparent 0 14px, rgba(255, 190, 190, 0.28) 14px 19px, transparent 19px 30px),
+    radial-gradient(ellipse 18px 3px at 50% 0, rgba(255, 255, 255, 0.35), transparent 70%) 0 0 / 30px 100% repeat-x;
+  animation: wl-flow 2.6s linear infinite;
+}
+.wl-bubbles {
+  background:
+    radial-gradient(circle at 20% 60%, rgba(255, 225, 225, 0.85) 0 1px, transparent 1.6px) 0 0 / 23px 100% repeat-x,
+    radial-gradient(circle at 65% 35%, rgba(255, 225, 225, 0.6) 0 0.8px, transparent 1.4px) 0 0 / 46px 100% repeat-x;
+  animation: wl-bubbles 1.7s linear infinite;
+}
+.wprog-slot.is-pr .wl-wave { background:
+    repeating-linear-gradient(105deg, transparent 0 14px, rgba(255, 245, 210, 0.45) 14px 19px, transparent 19px 30px); }
+.wprog-slot:not(.is-done) .wl-wave, .wprog-slot:not(.is-done) .wl-bubbles { animation-play-state: paused; opacity: 0; }
+@keyframes wl-flow { to { transform: translateX(-30px); } }
+@keyframes wl-bubbles {
+  0% { transform: translate(0, 1px); }
+  50% { transform: translate(-23px, -1px); }
+  100% { transform: translate(-46px, 1px); }
+}
+@media (prefers-reduced-motion: reduce) { .wl-wave, .wl-bubbles { animation: none !important; } }
 .wprog-ex.is-skipped .wprog-slot { background: repeating-linear-gradient(90deg, var(--border) 0 3px, transparent 3px 6px); }
 /* místo pro vyčnívající kulaté tlačítko Trénink */
 .view { padding-bottom: calc(var(--gutter) + 22px); }
