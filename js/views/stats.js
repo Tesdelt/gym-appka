@@ -18,6 +18,8 @@ import {
   exerciseChartTitle, frequencyRange, exerciseUsage,
 } from '../stats.js';
 import { recordText } from './exercise.js';
+import { listGoals } from '../goals.js';
+import { historyMarks } from '../marks.js';
 import { countUp } from '../fx.js';
 import { t, lang, locale, exName } from '../i18n.js';
 
@@ -324,8 +326,8 @@ function newKindDialog(kinds) {
 
 // ---------- Výkon cviku ----------
 async function renderExercise(container, id, titleEl) {
-  const [exercises, done, manualAll, gyms, lastGymId] = await Promise.all([
-    exerciseMap(), listDoneWorkouts(), listManualRecords(), listGyms(), getLastGymId(),
+  const [exercises, done, manualAll, gyms, lastGymId, goals] = await Promise.all([
+    exerciseMap(), listDoneWorkouts(), listManualRecords(), listGyms(), getLastGymId(), listGoals(),
   ]);
   const exercise = exercises.get(id);
   if (!exercise) { container.append(el('p', { class: 'muted', text: t('Cvik nenalezen.') })); return; }
@@ -333,13 +335,14 @@ async function renderExercise(container, id, titleEl) {
   let gymId = exercise.perGym ? (lastGymId ?? gyms[0]?.id) : null;
   const manual = manualAll.filter((m) => m.exerciseId === id);
   const sessions = [...done, ...manualAsWorkouts(manual, exercises)];
+  const marks = historyMarks(done, manualAsWorkouts(manualAll, exercises), goals).workouts;
   const rerender = () => { container.replaceChildren(); renderExercise(container, id, titleEl); };
 
   const body = el('div', { class: 'stack' });
   container.append(body);
   const draw = () => {
     const rec = computeRecords(sessions).get(recordKey({ exerciseId: id, perGym: exercise.perGym }, gymId));
-    const points = exercisePoints(sessions, exercise, gymId);
+    const points = exercisePoints(sessions, exercise, gymId, marks);
     const myManual = manual.filter((m) => !exercise.perGym || m.gymId === gymId);
 
     // tabulka: nejvíc opakování při dané váze

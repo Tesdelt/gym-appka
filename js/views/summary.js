@@ -1,12 +1,12 @@
 // Souhrn tréninku: při ukončení (škály, komentář, uložení) i jako detail
 // uloženého tréninku z historie.
 
-import { el, toast, confirmDialog, openDialog, promptText, stepField, formatValues, dateLong, timeShort } from '../ui.js';
+import { el, toast, confirmDialog, openDialog, promptNote, noteArea, stepField, formatValues, dateLong, timeShort } from '../ui.js';
 import { navigate, goBack } from '../router.js';
 import { slotsOf, workSlots, SET_TAGS, hasTag } from '../recommend.js';
 import { findNewRecords } from '../records.js';
 import { celebrate } from '../fx.js';
-import { listGoals, evaluateGoal, markReachedGoals } from '../goals.js';
+import { listGoals, evaluateGoal, markReachedGoals, goalHit } from '../goals.js';
 import { exerciseMap, listMeasurements, getTemplate, colorAttrs } from '../data.js';
 import { listManualRecords, manualAsWorkouts } from '../stats.js';
 import {
@@ -50,6 +50,11 @@ async function drawSummary(container, workout, id, state, redraw, actionEl) {
   const manualBefore = manualAsWorkouts(manual.filter((m) => m.date < workout.startedAt), exMap);
   const records = findNewRecords(workout, [...previousAll, ...manualBefore]);
   const recordSlots = new Set(records.map((r) => r.slot));
+  // série, kterými jsem v tomto tréninku splnil cíl (🔥)
+  const goals = await listGoals();
+  const asDone = { ...workout, status: 'done' };
+  const goalHits = goals.map((g) => ({ goal: g, hit: goalHit(g, [...previousAll, asDone]) })).filter((x) => x.hit?.workout.id === workout.id);
+  const goalSlots = new Set(goalHits.map(({ hit }) => `${hit.entryIndex}|${hit.slotIndex}`));
   const comparison = compareWithPrevious(workout, previousSame);
   const started = new Date(workout.startedAt);
   const nameOf = (entry) => exName(exMap.get(entry.exerciseId), entry.name);
@@ -83,10 +88,23 @@ async function drawSummary(container, workout, id, state, redraw, actionEl) {
     ]));
   }
 
+  // Cíle splněné tímto tréninkem (u uloženého tréninku)
+  if (workout.status !== 'active' && goalHits.length) {
+    stack.append(el('section', { class: 'card card-gold' }, [
+      el('h2', { class: 'card-title gold', text: t('Splněný cíl 🔥') }),
+      el('ul', { class: 'plain-list' }, goalHits.map(({ hit }) => {
+        const entry = workout.exercises[hit.entryIndex];
+        return el('li', {}, [
+          el('strong', { text: nameOf(entry) }),
+          el('span', { class: 'muted', text: ` – ${formatValues(entry, [slotsOf(entry)[hit.slotIndex]])}` }),
+        ]);
+      })),
+    ]));
+  }
+
   // Cíle: splněné nebo posunuté tímto tréninkem (jen při ukončení)
   if (workout.status === 'active') {
-    const [goals, exercises] = await Promise.all([listGoals(), exerciseMap()]);
-    const asDone = { ...workout, status: 'done' };
+    const exercises = exMap;
     const rows = [];
     for (const g of goals) {
       if (g.kind !== 'exercise' || g.status !== 'active') continue;
@@ -128,36 +146,43 @@ async function drawSummary(container, workout, id, state, redraw, actionEl) {
   // Cviky a série
   stack.append(el('section', { class: 'card' }, [
     el('h2', { class: 'card-title', text: t('Cviky') }),
-    ...workout.exercises.map((entry) => {
+    ...workout.exercises.map((entry, entryIndex) => {
       const slots = slotsOf(entry);
       const doneSlots = slots.map((s, i) => [s, i]).filter(([s]) => s.done);
       return el('div', { class: 'sum-ex' }, [
         el('strong', { class: 'block', text: nameOf(entry) }),
         doneSlots.length || state.editing
           ? el('ul', { class: 'plain-list sum-sets' }, (state.editing ? slots.map((s, i) => [s, i]) : doneSlots).map(([s, i]) => {
-            const text = ` ${s.done ? formatValues(entry, [s]) : t('neodcvičeno')}${recordSlots.has(s) ? ' ★' : ''}`;
+            const goalHitHere = goalSlots.has(`${entryIndex}|${i}`);
+            const text = ` ${s.done ? formatValues(entry, [s]) : t('neodcvičeno')}${recordSlots.has(s) ? ' ★' : ''}${goalHitHere ? ' 🔥' : ''}`;
+            const setNote = s.note ? el('span', { class: 'set-note small', text: s.note }) : null;
             if (!state.editing) {
-              return el('li', { class: `${recordSlots.has(s) ? 'gold' : ''} ${hasTag(s, 'warmup') ? 'is-warmup' : ''}` }, [
+              return el('li', { class: `${recordSlots.has(s) || goalHitHere ? 'gold' : ''} ${hasTag(s, 'warmup') ? 'is-warmup' : ''}` }, [
                 el('span', { class: 'muted small', text: slotLabel(entry, i) }),
                 el('span', { text }),
-                tagBadges(s),
+                tagBadges(s, entry),
+                setNote,
               ]);
             }
             return el('li', {}, [el('button', {
               type: 'button', class: 'set-edit',
               onclick: async () => { if (await editSlot(entry, s)) redraw(); },
-            }, [el('span', { class: 'muted small', text: `${slotLabel(entry, i)} ✎` }), el('span', {}, [el('span', { text }), tagBadges(s)])])]);
+            }, [el('span', { class: 'muted small', text: `${slotLabel(entry, i)} ✎` }), el('span', {}, [el('span', { text }), tagBadges(s, entry)]), setNote])]);
           }))
           : el('span', { class: 'muted small block', text: entry.skipped ? t('Přeskočeno') : t('Neodcvičeno') }),
         state.editing
           ? el('button', {
-            type: 'button', class: 'btn btn-small', text: entry.note ? t('Poznámka: {note}', { note: entry.note }) : t('Přidat poznámku'),
+            type: 'button', class: 'btn btn-small note-edit-btn', text: entry.note ? `✎ ${t('Poznámka ke cviku')}` : t('+ Poznámka ke cviku'),
             onclick: async () => {
-              const text = await promptText({ title: t('Poznámka k cviku'), value: entry.note ?? '' });
+              const text = await promptNote({ title: t('Poznámka ke cviku'), value: entry.note ?? '' });
               if (text != null) { entry.note = text; redraw(); }
             },
           })
-          : entry.note ? el('span', { class: 'small block', text: t('Poznámka: {note}', { note: entry.note }) }) : null,
+          : null,
+        entry.note ? el('div', { class: 'ex-note small' }, [
+          el('span', { class: 'muted block', text: t('Poznámka ke cviku') }),
+          el('span', { class: 'note-text block', text: entry.note }),
+        ]) : null,
         entry.next && entry.next !== 'keep' ? el('span', { class: 'muted small block', text: t('Na příště: {what}', { what: { more: t('přidat'), less: t('snížit') }[entry.next] }) }) : null,
       ]);
     }),
@@ -261,10 +286,12 @@ function editSlot(entry, slot) {
       type: 'button', class: `tag-chip tag-${key} ${tags.has(key) ? 'is-on' : ''}`, text: t(label),
       onclick: (e) => { if (tags.has(key)) tags.delete(key); else tags.add(key); e.currentTarget.classList.toggle('is-on', tags.has(key)); },
     })));
+    const note = noteArea(slot.note, { placeholder: t('Poznámka k sérii'), rows: 2 });
     const form = el('form', { method: 'dialog', class: 'dialog-body' }, [
       el('h2', { class: 'dialog-title', text: t('Upravit sérii') }),
       weight?.root, reps?.root, seconds?.root,
       tagRow,
+      note,
       el('div', { class: 'note-next' }, [el('span', { class: 'muted small', text: t('Stav') }), doneBtn]),
       el('div', { class: 'dialog-actions' }, [
         el('button', { type: 'button', class: 'btn', text: t('Zrušit'), onclick: () => close(false) }),
@@ -278,15 +305,17 @@ function editSlot(entry, slot) {
       if (seconds) { const v = seconds.value(); if (Number.isFinite(v)) slot.seconds = Math.round(v); }
       if (done !== slot.done) { slot.done = done; slot.doneAt = done ? new Date().toISOString() : null; }
       slot.tags = [...tags];
+      slot.note = note.value.trim();
       close(true);
     });
     return form;
   });
 }
 
-// Štítky série jako malé odznaky (zahřívací, selhání, po částech, s dopomocí)
-function tagBadges(slot) {
-  const on = SET_TAGS.filter(([key]) => hasTag(slot, key));
+// Štítky série jako malé odznaky (zahřívací, selhání, po částech, s dopomocí).
+// U běžných sérií je „Zahřívací“ už v popisku série, odznak se neopakuje.
+function tagBadges(slot, entry) {
+  const on = SET_TAGS.filter(([key]) => hasTag(slot, key) && !(key === 'warmup' && entry.mode !== 'dropset'));
   if (!on.length) return null;
   return el('span', { class: 'tag-badges' }, on.map(([key, label]) => el('span', { class: `tag-badge tag-${key}`, text: t(label) })));
 }

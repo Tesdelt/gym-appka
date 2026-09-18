@@ -5,11 +5,18 @@ import { getActiveWorkout, startWorkout, listDoneWorkouts } from '../workout.js'
 import { navigate } from '../router.js';
 import { t, locale, exName } from '../i18n.js';
 import { shouldRemindBackup, shareBackup, snoozeBackupReminder } from '../backup.js';
+import { listManualRecords, manualAsWorkouts } from '../stats.js';
+import { listGoals } from '../goals.js';
+import { historyMarks } from '../marks.js';
 
 export const title = t('Trénink');
 
 export async function render(container) {
-  const [active, done, templates, remind, exercises] = await Promise.all([getActiveWorkout(), listDoneWorkouts(), listTemplates(), shouldRemindBackup(), exerciseMap()]);
+  const [active, done, templates, remind, exercises, manual, goals] = await Promise.all([
+    getActiveWorkout(), listDoneWorkouts(), listTemplates(), shouldRemindBackup(), exerciseMap(), listManualRecords(), listGoals(),
+  ]);
+  // ★ posunutý osobní rekord, 🔥 splněný cíl
+  const marks = historyMarks(done, manualAsWorkouts(manual, exercises), goals).workouts;
   // u starších tréninků i rok
   const thisYear = new Date().getFullYear();
   const dateWithYear = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'numeric', year: '2-digit' });
@@ -41,7 +48,11 @@ export async function render(container) {
             }, [
               el('span', { class: 'history-date', text: dateOf(w.startedAt) }),
               el('span', { class: 'history-main' }, [
-                el('span', { class: 'history-name', text: w.name }),
+                el('span', { class: 'history-name' }, [
+                  w.name,
+                  marks.get(w.id)?.pr.size ? el('span', { class: 'mark-pr', text: ' ★', title: t('Osobní rekord') }) : null,
+                  marks.get(w.id)?.goal.size ? el('span', { class: 'mark-goal', text: ' 🔥', title: t('Splněný cíl') }) : null,
+                ]),
                 el('span', { class: 'history-sum muted small', text: headline(w, exercises) }),
               ]),
             ]),

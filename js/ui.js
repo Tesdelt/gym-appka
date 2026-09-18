@@ -39,7 +39,53 @@ export function openDialog(build, { cls = '', focus = true } = {}) {
     document.body.append(dialog);
     dialog.showModal();
     const input = focus ? dialog.querySelector('input, textarea') : null;
-    if (input) { input.focus(); input.select?.(); }
+    if (input) {
+      input.focus();
+      // u poznámky kurzor na konec, ať se text omylem nepřepíše
+      if (input.tagName === 'TEXTAREA') input.setSelectionRange(input.value.length, input.value.length);
+      else input.select?.();
+    }
+  });
+}
+
+// Víceřádková poznámka: Enter = nový řádek. Řádek s odrážkou („- “, „• “,
+// „1. “) pokračuje po Enteru další odrážkou; Enter na prázdné odrážce ji zruší.
+export function noteArea(value = '', { placeholder = '', rows = 3 } = {}) {
+  const area = el('textarea', { class: 'input textarea note-area', rows, placeholder, autocapitalize: 'sentences' });
+  area.value = value ?? '';
+  const bullet = () => {
+    const { selectionStart: pos, selectionEnd: end, value: text } = area;
+    const lineStart = text.lastIndexOf('\n', pos - 1) + 1;
+    const line = text.slice(lineStart, pos);
+    const m = line.match(/^(\s*)([-•*–]|(\d+)([.)]))\s+/);
+    if (!m) return false;
+    if (line.trim() === m[0].trim()) area.setRangeText('', lineStart, pos, 'end');
+    else area.setRangeText(`\n${m[1]}${m[3] ? `${Number(m[3]) + 1}${m[4]}` : m[2]} `, pos, end, 'end');
+    area.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  };
+  area.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.isComposing && !e.shiftKey && bullet()) e.preventDefault();
+  });
+  // některé klávesnice na iPhonu posílají Enter jen jako vstup nového řádku
+  area.addEventListener('beforeinput', (e) => {
+    if ((e.inputType === 'insertLineBreak' || e.inputType === 'insertParagraph') && bullet()) e.preventDefault();
+  });
+  return area;
+}
+
+// Dialog s víceřádkovou poznámkou. Vrátí text (oříznutý), nebo null při zrušení.
+export function promptNote({ title, value = '', placeholder = '', okLabel = t('Uložit') }) {
+  return openDialog((close) => {
+    const area = noteArea(value, { placeholder, rows: 5 });
+    return el('div', { class: 'dialog-body' }, [
+      el('h2', { class: 'dialog-title', text: title }),
+      area,
+      el('div', { class: 'dialog-actions' }, [
+        el('button', { type: 'button', class: 'btn', text: t('Zrušit'), onclick: () => close(null) }),
+        el('button', { type: 'button', class: 'btn btn-primary', text: okLabel, onclick: () => close(area.value.trim()) }),
+      ]),
+    ]);
   });
 }
 

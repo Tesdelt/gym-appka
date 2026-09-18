@@ -13,6 +13,7 @@ import { el, toast, confirmDialog, openDialog, formatValues, formatWeight, dateS
 import { navigate, goBack as routerBack } from '../router.js';
 import { listDoneWorkouts, buildEntry } from '../workout.js';
 import { listGoals } from '../goals.js';
+import { historyMarks } from '../marks.js';
 import { computeRecords, recordKey } from '../records.js';
 import { rangeChart } from '../chart.js';
 import { listManualRecords, manualAsWorkouts, exercisePoints, exerciseFormat, exerciseChartTitle } from '../stats.js';
@@ -61,6 +62,7 @@ async function renderDetail(container, exercise, extraEl) {
   const [done, gyms, templates, lastGymId, goals, manual] = await Promise.all([listDoneWorkouts(), listGyms(), listTemplates(), getLastGymId(), listGoals(), listManualRecords()]);
   const manualSessions = manualAsWorkouts(manual.filter((m) => m.exerciseId === exercise.id), new Map([[exercise.id, exercise]]));
   const records = computeRecords([...done, ...manualSessions]);
+  const marks = historyMarks(done, manualSessions, goals).workouts;
   let gymId = lastGymId ?? gyms[0]?.id;
 
   const stack = el('div', { class: 'stack' });
@@ -154,7 +156,7 @@ async function renderDetail(container, exercise, extraEl) {
       ?? { mode: 'sets', sets: [{ weight: 0, reps: 10, seconds: 30, rest: 180 }], repRange: null, weightStep: null };
     const entry = buildEntry(item, exercise, gymId, done, goals);
     const rec = records.get(recordKey({ exerciseId: exercise.id, perGym: exercise.perGym }, gymId));
-    const points = exercisePoints([...done, ...manualSessions], exercise, gymId);
+    const points = exercisePoints([...done, ...manualSessions], exercise, gymId, marks);
 
     progress.replaceChildren(...[
       el('h3', { class: 'card-title', text: t('Výkon') }),

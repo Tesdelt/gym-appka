@@ -9,11 +9,15 @@
 //     rounds: [{ steps: [slot] }], rest              (mode 'dropset')
 //     rec: [{weight, reps|seconds}], last: { date, values: [...] } | null }
 // Série / stupeň (slot):
-//   { plan: {weight, reps, seconds}, range: {min, max}, rest, weight, reps, seconds, done, doneAt }
+//   { plan: {weight, reps, seconds}, range: {min, max}, rest, weight, reps, seconds, done, doneAt,
+//     tags: ['warmup'|'fail'|'partial'|'assisted'], note }
+//   Poznámka k sérii je slot.note, poznámka k celému cviku entry.note.
+//   Zahřívací série se zapisují bokem: vloží se jako hotová před aktuální
+//   sérii a do postupu tréninku se nepočítají.
 
 import { getAll, get, put, remove, newId } from './db.js';
 import { getExercise, getTemplate, weightStepFor, setLastGymId, defaultRest } from './data.js';
-import { rangeFor, recommendSets, recommendDropset, slotsOf, round5, isWork, workSlots } from './recommend.js';
+import { rangeFor, recommendSets, recommendDropset, slotsOf, round5, isWork, workSlots, hasTag } from './recommend.js';
 import { listGoals, activeGoalFor, evaluateGoal, goalAdjust } from './goals.js';
 import { t } from './i18n.js';
 
@@ -40,15 +44,24 @@ export function deleteWorkout(id) {
   return remove('workouts', id);
 }
 
-// Poslední dokončený záznam daného cviku (u kladek jen ve stejné posilovně)
-export function findLastEntry(doneWorkouts, exerciseId, perGym, gymId, before = null) {
+// Poslední dokončený záznam daného cviku (u kladek jen ve stejné posilovně).
+// occurrence: kolikátý výskyt cviku v tréninku (0 = první). Druhý výskyt
+// vychází z druhého výskytu v posledním tréninku, kde cvik byl dvakrát;
+// když takový není, z prvního.
+export function findLastEntry(doneWorkouts, exerciseId, perGym, gymId, before = null, occurrence = 0) {
   for (const w of doneWorkouts) {
     if (before && w.startedAt >= before) continue;
     if (perGym && w.gymId !== gymId) continue;
-    const entry = w.exercises.find((e) => e.exerciseId === exerciseId && slotsOf(e).some(isWork));
+    const entry = w.exercises.filter((e) => e.exerciseId === exerciseId && slotsOf(e).some(isWork))[occurrence];
     if (entry) return { entry, workout: w };
   }
-  return null;
+  return occurrence > 0 ? findLastEntry(doneWorkouts, exerciseId, perGym, gymId, before, 0) : null;
+}
+
+// Kolikátý výskyt cviku je záznam v tréninku (0 = první)
+export function occurrenceOf(exercises, index) {
+  const id = exercises[index].exerciseId;
+  return exercises.slice(0, index).filter((e) => e.exerciseId === id).length;
 }
 
 // ---------- Vytvoření ----------
@@ -59,7 +72,8 @@ export async function startWorkout(templateId, gymId, gymName) {
   for (const item of template.exercises) {
     const exercise = await getExercise(item.exerciseId);
     if (!exercise) continue;
-    exercises.push(buildEntry(item, exercise, gymId, done, goals));
+    const occurrence = exercises.filter((e) => e.exerciseId === exercise.id).length;
+    exercises.push(buildEntry(item, exercise, gymId, done, goals, occurrence));
   }
   const workout = {
     id: newId(),
@@ -91,8 +105,8 @@ function slotFrom(templateSet, range, rest, exercise) {
 
 // Sestaví záznam cviku ze šablony, předvyplní hodnoty z posledního tréninku
 // a spočítá doporučení.
-export function buildEntry(item, exercise, gymId, doneWorkouts, goals = []) {
-  const last = findLastEntry(doneWorkouts, exercise.id, exercise.perGym, gymId);
+export function buildEntry(item, exercise, gymId, doneWorkouts, goals = [], occurrence = 0) {
+  const last = findLastEntry(doneWorkouts, exercise.id, exercise.perGym, gymId, null, occurrence);
   const entry = {
     uid: newId(),
     exerciseId: exercise.id,
@@ -193,8 +207,9 @@ function prefill(slot, ref) {
 }
 
 // Záznam pro cvik přidaný během tréninku (mimo šablonu): sady ze šablony,
-// kde se cvik vyskytuje, jinak výchozí 3 série.
-export async function buildAdHocEntry(exercise, gymId, templates) {
+// kde se cvik vyskytuje, jinak výchozí 3 série. occurrence = kolikátý výskyt
+// cviku v tomto tréninku to bude.
+export async function buildAdHocEntry(exercise, gymId, templates, occurrence = 0) {
   const [done, goals] = await Promise.all([listDoneWorkouts(), listGoals()]);
   let item = null;
   for (const t of templates) {
@@ -206,7 +221,7 @@ export async function buildAdHocEntry(exercise, gymId, templates) {
     const base = exercise.type === 'time' ? { weight: 0, seconds: 60, rest } : { weight: 0, reps: 10, rest };
     item = { mode: 'sets', sets: [base, base, base], repRange: null, weightStep: null };
   }
-  return buildEntry(item, exercise, gymId, done, goals);
+  return buildEntry(item, exercise, gymId, done, goals, occurrence);
 }
 
 // ---------- Pozice v tréninku ----------
@@ -217,8 +232,14 @@ export function slotLabel(entry, index) {
     const step = index % steps;
     return t('Kolo {a}/{b}, váha {c}/{d}', { a: round + 1, b: entry.rounds.length, c: step + 1, d: steps });
   }
-  return t('Série {a}/{b}', { a: index + 1, b: entry.sets.length });
+  // zahřívací série se do číslování nepočítají
+  if (hasTag(entry.sets[index], 'warmup')) return t('Zahřívací');
+  const work = entry.sets.filter((s) => !hasTag(s, 'warmup'));
+  return t('Série {a}/{b}', { a: work.indexOf(entry.sets[index]) + 1, b: work.length });
 }
+
+// Zahřívací série zapsaná bokem (hotová, mimo postup tréninku)
+export const isSideWarmup = (slot) => slot.done && hasTag(slot, 'warmup');
 
 // Pauza po dané sérii: u drop setu jen po posledním stupni kola
 export function restAfter(entry, index) {
@@ -260,10 +281,10 @@ export function nextUndone(workout, from) {
       if (!slots[i].done) return { ex, slot: i };
     }
   }
-  // dříve přeskočené série ve stejném cviku
+  // dříve přeskočené série ve stejném cviku (kromě té, ze které odcházím)
   if (workout.exercises[start.ex]?.skipped) return null;
   const slots = slotsOf(workout.exercises[start.ex]);
-  for (let i = 0; i <= start.slot && i < slots.length; i++) {
+  for (let i = 0; i < start.slot && i < slots.length; i++) {
     if (!slots[i].done) return { ex: start.ex, slot: i };
   }
   return null;
@@ -278,9 +299,11 @@ export function firstUndoneIn(entry) {
 export function nextInOrder(workout, from) {
   if (!from) return null;
   const slots = slotsOf(workout.exercises[from.ex]);
-  if (from.slot + 1 < slots.length) return { ex: from.ex, slot: from.slot + 1 };
+  for (let i = from.slot + 1; i < slots.length; i++) if (!isSideWarmup(slots[i])) return { ex: from.ex, slot: i };
   for (let ex = from.ex + 1; ex < workout.exercises.length; ex++) {
-    if (!workout.exercises[ex].skipped) return { ex, slot: 0 };
+    if (workout.exercises[ex].skipped) continue;
+    const i = slotsOf(workout.exercises[ex]).findIndex((sl) => !isSideWarmup(sl));
+    if (i !== -1) return { ex, slot: i };
   }
   return null;
 }
@@ -299,9 +322,12 @@ export function adjacentExercise(workout, from, dir) {
 // Předchozí pozice v pořadí, nebo null na začátku.
 export function prevInOrder(workout, from) {
   if (!from) return null;
-  if (from.slot > 0) return { ex: from.ex, slot: from.slot - 1 };
+  const slots = slotsOf(workout.exercises[from.ex]);
+  for (let i = from.slot - 1; i >= 0; i--) if (!isSideWarmup(slots[i])) return { ex: from.ex, slot: i };
   for (let ex = from.ex - 1; ex >= 0; ex--) {
-    if (!workout.exercises[ex].skipped) return { ex, slot: slotsOf(workout.exercises[ex]).length - 1 };
+    if (workout.exercises[ex].skipped) continue;
+    const list = slotsOf(workout.exercises[ex]);
+    for (let i = list.length - 1; i >= 0; i--) if (!isSideWarmup(list[i])) return { ex, slot: i };
   }
   return null;
 }
@@ -323,8 +349,56 @@ export function completeCurrent(workout) {
   if (!cur.slot.done) {
     cur.slot.done = true;
     cur.slot.doneAt = new Date().toISOString();
+    carryForward(cur.entry, cur.index);
   }
   workout.cursor = target ?? nextUndone(workout, workout.cursor);
+}
+
+// Co jsem v sérii změnil proti plánu (váha, opakování, výdrž), platí i pro
+// další neodcvičené série cviku – kromě těch, které jsem sám upravil.
+// U drop setu pro stejný stupeň v dalších kolech. Pauzu přenáší už volba pauzy.
+function carryForward(entry, index) {
+  const slots = slotsOf(entry);
+  const src = slots[index];
+  if (hasTag(src, 'warmup')) return;
+  const step = entry.mode === 'dropset' ? entry.rounds[0].steps.length : 1;
+  for (let i = index + step; i < slots.length; i += step) {
+    const s = slots[i];
+    if (s.done || hasTag(s, 'warmup')) continue;
+    for (const k of ['weight', 'reps', 'seconds']) {
+      if (src[k] == null || src[k] === src.plan?.[k] || s[k] !== s.plan?.[k]) continue;
+      s[k] = src[k];
+      s.plan = { ...s.plan, [k]: src[k] };
+    }
+  }
+}
+
+// Aktuální série je označená jako zahřívací a ještě není hotová: zapíše se
+// bokem jako hotová zahřívací série před ní a aktuální série zůstane
+// neodcvičená s hodnotami, se kterými začínala (plán).
+export function canLogWarmup(workout) {
+  const cur = currentSlot(workout);
+  return Boolean(cur && cur.entry.mode !== 'dropset' && !cur.slot.done && hasTag(cur.slot, 'warmup'));
+}
+
+export function logWarmup(workout) {
+  if (!canLogWarmup(workout)) return false;
+  const { entry, slot, index } = currentSlot(workout);
+  entry.sets.splice(index, 0, {
+    plan: { weight: slot.weight, reps: slot.reps, seconds: slot.seconds }, range: { ...slot.range }, rest: slot.rest,
+    weight: slot.weight, reps: slot.reps, seconds: slot.seconds, done: true, doneAt: new Date().toISOString(),
+    tags: [...slot.tags], note: slot.note ?? '', added: true,
+  });
+  slot.tags = slot.tags.filter((x) => x !== 'warmup');
+  slot.note = '';
+  Object.assign(slot, { weight: slot.plan.weight, reps: slot.plan.reps, seconds: slot.plan.seconds });
+  workout.cursor = { ex: workout.cursor.ex, slot: index + 1 };
+  return true;
+}
+
+// Není co cvičit: všechny série hotové (přeskočené cviky se nepočítají)
+export function allDone(workout) {
+  return workout.exercises.length > 0 && nextUndone(workout, null) == null;
 }
 
 // ---------- Série navíc / méně během tréninku ----------
@@ -408,8 +482,9 @@ export async function finishWorkout(workout, { scales, comment }) {
 export function compareWithPrevious(workout, previous) {
   if (!previous) return [];
   const out = [];
-  for (const entry of workout.exercises) {
-    const prev = previous.exercises.find((e) => e.exerciseId === entry.exerciseId);
+  for (const [i, entry] of workout.exercises.entries()) {
+    const same = previous.exercises.filter((e) => e.exerciseId === entry.exerciseId);
+    const prev = same[occurrenceOf(workout.exercises, i)] ?? same[0];
     const now = doneValues(entry);
     if (!prev || !now.length) continue;
     const before = doneValues(prev);

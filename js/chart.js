@@ -92,7 +92,7 @@ export function lineChart(points, { format = (v) => String(v), height = 170, onO
     const text = document.createElement('span');
     text.className = 'chart-info-text';
     text.innerHTML = `<strong></strong> <span class="muted"></span>`;
-    text.firstElementChild.textContent = (p.detail ?? format(p.v)) + (p.gold ? ' ★' : '');
+    text.firstElementChild.textContent = (p.detail ?? format(p.v)) + (p.gold || p.pr ? ' ★' : '') + (p.goal ? ' 🔥' : '');
     text.lastElementChild.textContent = `· ${longFmt.format(p.t)}${p.manual ? ` · ${t('ruční záznam')}` : ''}`;
     info.append(text);
     if (onOpen && p.workoutId) {

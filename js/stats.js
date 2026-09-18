@@ -48,8 +48,9 @@ export function manualAsWorkouts(manual, exercises) {
 }
 
 // Body grafu výkonu cviku: nejlepší hodnota z každého tréninku / záznamu.
-// Maximum je zlaté.
-export function exercisePoints(sessions, exercise, gymId) {
+// Maximum je zlaté. marks (historyMarks().workouts): ★ trénink s osobním
+// rekordem u cviku, 🔥 trénink se splněným cílem.
+export function exercisePoints(sessions, exercise, gymId, marks = null) {
   const points = [];
   for (const w of sessions) {
     if (exercise.perGym && w.gymId !== gymId) continue;
@@ -72,7 +73,13 @@ export function exercisePoints(sessions, exercise, gymId) {
         : exercise.type === 'reps' ? `${best.reps} ×`
           : `${formatWeight(best.weight, { bodyweight: exercise.bodyweight })} × ${best.reps}`;
       const detail = w.manual ? bestText : `${bestText} · ${plural(slots.length, ['série', 'série', 'sérií'], ['set', 'sets'])}`;
-      if (Number.isFinite(v)) points.push({ t: w.startedAt, v, detail, manual: Boolean(w.manual), workoutId: w.manual ? null : w.id });
+      const m = marks?.get(w.id);
+      if (Number.isFinite(v)) {
+        points.push({
+          t: w.startedAt, v, detail, manual: Boolean(w.manual), workoutId: w.manual ? null : w.id,
+          pr: Boolean(m?.pr.has(exercise.id)), goal: Boolean(m?.goal.has(exercise.id)),
+        });
+      }
     }
   }
   if (points.length) {

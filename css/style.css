@@ -1050,3 +1050,20 @@ input[type="date"].input { min-height: var(--tap); line-height: var(--tap); }
 .chart-info { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 40px; margin-top: 4px; }
 .chart-info-text { font-size: 14px; }
 .chart-info .btn { flex: none; }
+
+/* ---------- Poznámky k sérii a cviku ---------- */
+.note-btn { display: flex; align-items: center; font: inherit; font-size: 15px; text-align: left; color: var(--text-2); cursor: pointer; }
+.note-btn > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.note-btn.has-note { color: var(--text); }
+.note-area { white-space: pre-wrap; }
+.set-note { display: block; margin: 1px 0 4px; color: var(--text-2); white-space: pre-line; }
+.ex-note { margin-top: 6px; }
+.note-text { white-space: pre-line; }
+.note-edit-btn { margin-top: 6px; }
+.dialog-body .note-area + * { margin-top: 12px; }
+
+/* ---------- Značky v historii ---------- */
+.mark-pr { color: var(--gold); }
+
+/* výběr cviku: + Nový a Zavřít */
+.picker-actions { flex: none; display: flex; gap: 8px; }

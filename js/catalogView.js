@@ -21,6 +21,9 @@ import { t, lang, exName } from './i18n.js';
 const state = { query: '', groups: new Set(), parts: new Set(), open: new Set() };
 const PAGE = 45;
 
+// Aktuální hledaný text (např. jako název nového cviku)
+export const currentQuery = () => state.query.trim();
+
 export async function mountCatalog(host, { scrollRoot, onMine, onDb, onInfo = null, exclude = [], showCatalog = true, focus = false }) {
   const excluded = new Set(exclude);
   const [allMine, catalog] = await Promise.all([listExercises(), showCatalog ? loadCatalog().catch(() => []) : []]);

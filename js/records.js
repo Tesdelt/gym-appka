@@ -18,18 +18,20 @@ function emptyRecord() {
 // workouts: dokončené tréninky (libovolné pořadí)
 export function computeRecords(workouts) {
   const records = new Map();
-  for (const w of workouts) {
-    for (const entry of w.exercises) {
-      const key = recordKey(entry, w.gymId);
-      if (!records.has(key)) records.set(key, emptyRecord());
-      const rec = records.get(key);
-      for (const slot of slotsOf(entry)) {
-        if (!isClean(slot)) continue;
-        applySlot(rec, entry, slot, { date: w.startedAt, workoutId: w.id });
-      }
+  for (const w of workouts) addWorkout(records, w);
+  return records;
+}
+
+function addWorkout(records, w) {
+  for (const entry of w.exercises) {
+    const key = recordKey(entry, w.gymId);
+    if (!records.has(key)) records.set(key, emptyRecord());
+    const rec = records.get(key);
+    for (const slot of slotsOf(entry)) {
+      if (!isClean(slot)) continue;
+      applySlot(rec, entry, slot, { date: w.startedAt, workoutId: w.id });
     }
   }
-  return records;
 }
 
 function applySlot(rec, entry, slot, meta) {
@@ -48,20 +50,36 @@ function applySlot(rec, entry, slot, meta) {
 }
 
 // Nové rekordy v tréninku `workout` oproti `previousWorkouts`.
-// Vrací pole { entryUid, slot, kind, text }. Cvik bez dřívějších záznamů
-// rekord nedává (není s čím srovnávat); z jednoho tréninku se hlásí jen
-// nejlepší série každého druhu.
+// Vrací pole { entryUid, entryIndex, slot, slotIndex, kind, text }. Cvik bez
+// dřívějších záznamů rekord nedává (není s čím srovnávat); z jednoho tréninku
+// se hlásí jen nejlepší série každého druhu.
 export function findNewRecords(workout, previousWorkouts) {
-  const before = computeRecords(previousWorkouts);
+  return newRecordsAgainst(workout, computeRecords(previousWorkouts));
+}
+
+// Série, kterými jsem posunul osobní rekord, napříč historií.
+// sessions: tréninky i ruční záznamy (ty se jen započítají, neoznačují se).
+// Vrací Set klíčů `${workoutId}|${entryIndex}|${slotIndex}`.
+export function recordMarks(sessions) {
+  const records = new Map();
+  const marks = new Set();
+  for (const w of [...sessions].sort((a, b) => a.startedAt.localeCompare(b.startedAt))) {
+    if (!w.manual) for (const r of newRecordsAgainst(w, records)) marks.add(`${w.id}|${r.entryIndex}|${r.slotIndex}`);
+    addWorkout(records, w);
+  }
+  return marks;
+}
+
+function newRecordsAgainst(workout, before) {
   const found = [];
-  for (const entry of workout.exercises) {
+  for (const [entryIndex, entry] of workout.exercises.entries()) {
     const prev = before.get(recordKey(entry, workout.gymId));
     if (!prev) continue;
     const now = emptyRecord();
     for (const slot of slotsOf(entry)) {
       if (isClean(slot)) applySlot(now, entry, slot, { slot });
     }
-    const push = (kind, text, meta) => found.push({ entryUid: entry.uid, slot: meta.slot, kind, text });
+    const push = (kind, text, meta) => found.push({ entryUid: entry.uid, entryIndex, slot: meta.slot, slotIndex: slotsOf(entry).indexOf(meta.slot), kind, text });
 
     if (entry.type === 'time') {
       if (now.maxSeconds && (!prev.maxSeconds || now.maxSeconds.value > prev.maxSeconds.value)) push('maxSeconds', t('Nejdelší výdrž'), now.maxSeconds);

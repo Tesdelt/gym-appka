@@ -1,6 +1,6 @@
 // Obrazovka průběhu tréninku: vše na jedné obrazovce bez scrollování.
 
-import { el, openDialog, confirmDialog, promptNumber, toast, makeSortable, dragHandle, formatWeight, formatValues, dateShort } from '../ui.js';
+import { el, openDialog, confirmDialog, promptNumber, toast, makeSortable, dragHandle, formatWeight, formatValues, dateShort, noteArea } from '../ui.js';
 import { navigate } from '../router.js';
 import { listTemplates } from '../data.js';
 import { slotsOf, SET_TAGS, hasTag } from '../recommend.js';
@@ -13,6 +13,7 @@ import { celebrate, shockwave, reducedMotion, slideOut, slideIn, onSwipe } from 
 import {
   getActiveWorkout, saveWorkout, deleteWorkout, currentSlot, completeCurrent, nextUndone, firstUndoneIn,
   positionAfterConfirm, prevInOrder, adjacentExercise, listDoneWorkouts, slotLabel, addSetAfterCurrent, removeLastUndoneSet, restAfter, entryDone, elapsedSeconds, formatDuration, buildAdHocEntry,
+  canLogWarmup, logWarmup, allDone, isSideWarmup, occurrenceOf,
 } from '../workout.js';
 import { t, locale, exName } from '../i18n.js';
 
@@ -145,11 +146,13 @@ function currentCard(workout, cur, ctx) {
   const { entry, slot, index } = cur;
   const rec = recommendationFor(entry, index);
   const card = el('section', { class: 'card card-current' });
+  const warmups = slotsOf(entry).filter(isSideWarmup);
 
   // Hlavička
   // série: − ubere poslední neodcvičenou, + vloží kopii aktuální za ni
   const undone = slotsOf(entry).filter((st) => !st.done).length;
-  const canRemove = entry.mode === 'dropset' ? entry.rounds.length > 1 && undone > 0 : entry.sets.length > 1 && undone > 0;
+  const workCount = slotsOf(entry).filter((st) => !isSideWarmup(st)).length;
+  const canRemove = entry.mode === 'dropset' ? entry.rounds.length > 1 && undone > 0 : workCount > 1 && undone > 0;
   card.append(el('div', { class: 'ex-head' }, [
     el('h2', { class: 'ex-name', text: nameOf(entry, ctx) }),
     el('div', { class: 'set-control' }, [
@@ -185,6 +188,7 @@ function currentCard(workout, cur, ctx) {
       }),
       metaRow(entry.last ? t('Minule {date}', { date: dateShort.format(new Date(entry.last.date)) }) : t('Minule'), entry.last ? formatValues(entry, entry.last.values) : t('poprvé')),
       metaRow(entry.goal?.applied ? t('Doporučení podle cíle') : t('Doporučení'), rec ? formatValues(entry, [rec]) : '–'),
+      warmups.length ? metaRow(t('Zahřívací (bokem)'), formatValues(entry, warmups)) : null,
     ]),
     cd?.root,
   ]));
@@ -236,6 +240,12 @@ function currentCard(workout, cur, ctx) {
       if (on) slot.tags.push(key);
       e.currentTarget.classList.toggle('is-on', on);
       e.currentTarget.setAttribute('aria-pressed', String(on));
+      // zahřívací mění tlačítko Hotovo na „Zapsat zahřívací“
+      if (key === 'warmup' && !slot.done) {
+        ctx.save();
+        ctx.draw();
+        return;
+      }
       ctx.save();
       ctx.progress.update(workout);
     },
@@ -244,10 +254,12 @@ function currentCard(workout, cur, ctx) {
   // Navigace: malá šipka zpět, velké potvrzení vpřed
   const after = positionAfterConfirm(workout);
   const prev = prevInOrder(workout, workout.cursor);
-  const toNextExercise = Boolean(after) && after.ex !== workout.cursor.ex;
+  const warmup = canLogWarmup(workout);
+  const toNextExercise = !warmup && Boolean(after) && after.ex !== workout.cursor.ex;
   let label;
   let arrow;
-  if (!after) { label = slot.done ? t('Uložit') : t('Hotovo'); arrow = '✓'; }
+  if (warmup) { label = t('Zapsat zahřívací'); arrow = '↺'; }
+  else if (!after) { label = slot.done ? t('Uložit') : t('Dokončit trénink'); arrow = '✓'; }
   else if (toNextExercise) { label = t('Další cvik'); arrow = '⇥'; }
   else { label = slot.done ? t('Uložit') : t('Hotovo'); arrow = '→'; }
 
@@ -258,26 +270,44 @@ function currentCard(workout, cur, ctx) {
     }),
     el('button', {
       type: 'button', class: `btn btn-primary btn-done ${toNextExercise ? 'is-next-exercise' : ''}`,
-      onclick: () => {
+      onclick: async () => {
         if (cd) {
           const held = cd.heldSeconds();
           if (held != null && held < slot.seconds) { slot.seconds = Math.max(1, held); toast(t('Zapsáno {n} s', { n: slot.seconds })); }
           cd.stop();
         }
+        // zahřívací série: zapíše se bokem, zůstávám na stejné sérii
+        if (warmup) {
+          logWarmup(workout);
+          ctx.save();
+          ctx.draw();
+          toast(t('Zahřívací série zapsána bokem'));
+          return;
+        }
         const record = isNewRecord(workout, cur, ctx);
         card.classList.add('is-confirmed');
         if (record) { cur.slot.pr = true; celebrate(); toast(t('Nový osobní rekord!')); }
+        // poslední série: rovnou konec tréninku a souhrn
+        if (!slot.done && !after) {
+          completeCurrent(workout);
+          workout.endedAt = new Date().toISOString();
+          await ctx.save();
+          await slideOut(card, 1);
+          navigate('souhrn');
+          return;
+        }
         ctx.move(1, () => completeCurrent(workout));
       },
     }, [el('span', { class: 'btn-done-label', text: label }), el('span', { class: 'btn-done-arrow', text: arrow })]),
   ]));
 
-  // Poznámka a volba na příště
-  const note = el('input', {
-    type: 'text', class: 'input note-input', placeholder: t('Poznámka k cviku…'), autocomplete: 'off',
-    oninput: (e) => { entry.note = e.target.value; ctx.saveLater(); },
-  });
-  note.value = entry.note ?? '';
+  // Poznámka (k sérii, případně k celému cviku) a volba na příště
+  const firstLine = (text) => String(text ?? '').split('\n').find((l) => l.trim())?.trim() ?? '';
+  const noteText = slot.note ? firstLine(slot.note) : entry.note ? `${t('Cvik:')} ${firstLine(entry.note)}` : '';
+  const note = el('button', {
+    type: 'button', class: `input note-input note-btn ${noteText ? 'has-note' : ''}`,
+    onclick: async () => { if (await notesDialog(entry, slot, index)) { ctx.save(); ctx.draw(); } },
+  }, [el('span', { text: noteText ? `✎ ${noteText}` : t('✎ Poznámka k sérii nebo cviku…') })]);
   const choices = [['less', t('Snížit')], ['keep', t('Nechat')], ['more', t('Přidat')]];
   const seg = el('div', { class: 'segmented', role: 'group', 'aria-label': t('Na příště') },
     choices.map(([value, text]) => el('button', {
@@ -300,6 +330,26 @@ function currentCard(workout, cur, ctx) {
   });
 
   return card;
+}
+
+// Poznámky: k této sérii a k celému cviku. Vrátí true po uložení.
+function notesDialog(entry, slot, index) {
+  return openDialog((close) => {
+    const setNote = noteArea(slot.note, { placeholder: t('Např. poslední opakování s dopomocí'), rows: 4 });
+    const exNote = noteArea(entry.note, { placeholder: t('Např. příště vyšší váha'), rows: 3 });
+    return el('div', { class: 'dialog-body stack-tight' }, [
+      el('h2', { class: 'dialog-title', text: t('Poznámky') }),
+      el('label', { class: 'field' }, [el('span', { class: 'field-label', text: t('K sérii ({label})', { label: slotLabel(entry, index) }) }), setNote]),
+      el('label', { class: 'field' }, [el('span', { class: 'field-label', text: t('K celému cviku') }), exNote]),
+      el('div', { class: 'dialog-actions' }, [
+        el('button', { type: 'button', class: 'btn', text: t('Zrušit'), onclick: () => close(false) }),
+        el('button', {
+          type: 'button', class: 'btn btn-primary', text: t('Uložit'),
+          onclick: () => { slot.note = setNote.value.trim(); entry.note = exNote.value.trim(); close(true); },
+        }),
+      ]),
+    ]);
+  });
 }
 
 // Je právě potvrzovaná série nový osobní rekord? (jen když cvik už má historii)
@@ -533,8 +583,8 @@ function nextPreview(workout, ctx) {
 }
 
 function describeEntry(entry) {
-  const slots = slotsOf(entry);
-  const first = slots[0];
+  const slots = slotsOf(entry).filter((s) => !isSideWarmup(s));
+  const first = slots[0] ?? slotsOf(entry)[0];
   if (entry.mode === 'dropset') return t('drop set, {rounds} kola × {steps} váhy', { rounds: entry.rounds.length, steps: entry.rounds[0].steps.length });
   const weight = entry.type === 'reps' ? '' : `${formatWeight(first.weight, { bodyweight: entry.bodyweight })}, `;
   const value = entry.type === 'time' ? `${first.seconds} s` : `${first.reps}`;
@@ -549,7 +599,7 @@ async function exerciseListSheet(workout, ctx) {
 
     const draw = () => {
       list.replaceChildren(...workout.exercises.map((entry, i) => {
-        const slots = slotsOf(entry);
+        const slots = slotsOf(entry).filter((s) => !isSideWarmup(s));
         const doneCount = slots.filter((s) => s.done).length;
         const isCurrent = workout.cursor?.ex === i;
         const row = el('li', { class: `list-row ex-row ${isCurrent ? 'is-current' : ''}`, 'data-index': i }, [
@@ -604,14 +654,16 @@ async function exerciseListSheet(workout, ctx) {
     async function add() {
       const exercise = await pickExercise({ title: t('Přidat cvik') });
       if (!exercise) return;
-      workout.exercises.push(await buildAdHocEntry(exercise, workout.gymId, await listTemplates()));
+      const occurrence = workout.exercises.filter((e) => e.exerciseId === exercise.id).length;
+      workout.exercises.push(await buildAdHocEntry(exercise, workout.gymId, await listTemplates(), occurrence));
       fixCursor();
       ctx.save(); draw(); ctx.draw();
     }
     async function replace(i) {
       const exercise = await pickExercise({ title: t('Nahradit cvik') });
       if (!exercise) return;
-      workout.exercises[i] = await buildAdHocEntry(exercise, workout.gymId, await listTemplates());
+      const occurrence = workout.exercises.slice(0, i).filter((e) => e.exerciseId === exercise.id).length;
+      workout.exercises[i] = await buildAdHocEntry(exercise, workout.gymId, await listTemplates(), occurrence);
       if (workout.cursor?.ex === i) workout.cursor.slot = 0;
       fixCursor();
       ctx.save(); draw(); ctx.draw();
@@ -663,17 +715,19 @@ function progressBar(onJump) {
     const ex = [...root.children].indexOf(group);
     const slots = [...group.children];
     const hit = slots.findIndex((sl) => e.clientX <= sl.getBoundingClientRect().right + 1);
-    onJump(ex, hit === -1 ? slots.length - 1 : hit);
+    onJump(ex, indexMap[ex][hit === -1 ? slots.length - 1 : hit]);
   });
   let signature = '';
   let slotEls = [];
+  let indexMap = []; // pořadí v pásu → index série (zahřívací bokem v pásu nejsou)
   return {
     root,
     update(workout) {
-      const sig = workout.exercises.map((e) => `${e.uid}:${slotsOf(e).length}`).join('|');
+      indexMap = workout.exercises.map((entry) => slotsOf(entry).map((sl, k) => (isSideWarmup(sl) ? -1 : k)).filter((k) => k !== -1));
+      const sig = workout.exercises.map((e, i) => `${e.uid}:${indexMap[i].join(',')}`).join('|');
       if (sig !== signature) {
         signature = sig;
-        slotEls = workout.exercises.map((entry) => slotsOf(entry).map(() => el('div', { class: 'wprog-slot' }, [
+        slotEls = indexMap.map((list) => list.map(() => el('div', { class: 'wprog-slot' }, [
           el('div', { class: 'wprog-fill' }, [el('div', { class: 'wl-wave' }), el('div', { class: 'wl-bubbles' })]),
         ])));
         root.replaceChildren(...slotEls.map((slots, i) => el('div', { class: 'wprog-ex', style: `flex-grow: ${slots.length}` }, slots)));
@@ -682,10 +736,11 @@ function progressBar(onJump) {
       let total = 0;
       workout.exercises.forEach((entry, i) => {
         root.children[i].classList.toggle('is-skipped', Boolean(entry.skipped));
-        slotsOf(entry).forEach((slot, k) => {
+        indexMap[i].forEach((k, pos) => {
+          const slot = slotsOf(entry)[k];
           total++;
           if (slot.done) done++;
-          const node = slotEls[i][k];
+          const node = slotEls[i][pos];
           node.classList.toggle('is-done', slot.done);
           node.classList.toggle('is-pr', Boolean(slot.pr && slot.done));
           node.classList.toggle('is-warmup', hasTag(slot, 'warmup'));

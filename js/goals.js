@@ -109,6 +109,24 @@ function sessionsWith(done, goal, after = null) {
   return out;
 }
 
+// Kde jsem cíl splnil: první série po vytvoření cíle, která ho splňuje.
+// Vrací { workout, entryIndex, slotIndex } nebo null.
+export function goalHit(goal, workouts) {
+  if (goal.kind !== 'exercise') return null;
+  const target = goalTarget(goal);
+  const list = workouts
+    .filter((w) => (!w.status || w.status === 'done') && !w.manual && w.startedAt > goal.createdAt && (!goal.gymId || w.gymId === goal.gymId))
+    .sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+  for (const w of list) {
+    for (const [entryIndex, e] of w.exercises.entries()) {
+      if (e.exerciseId !== goal.exerciseId) continue;
+      const slotIndex = slotsOf(e).findIndex((s) => isClean(s) && meets(s, target));
+      if (slotIndex !== -1) return { workout: w, entryIndex, slotIndex };
+    }
+  }
+  return null;
+}
+
 // Kolik tréninků s cvikem ještě stihnu do data: podle toho, jak často ho
 // dělám poslední 4 týdny (aspoň jednou týdně)
 function sessionsUntil(done, goal, days) {
