@@ -6,15 +6,20 @@ import * as stats from './views/stats.js';
 import * as goals from './views/goals.js';
 import * as exercises from './views/exercises.js';
 import * as settings from './views/settings.js';
+import * as workout from './views/workout.js';
+import * as summary from './views/summary.js';
 
 addRoute('domu', home);
 addRoute('statistiky', stats);
 addRoute('cile', goals);
 addRoute('cviky', exercises);
 addRoute('nastaveni', settings);
+addRoute('trenink', workout);
+addRoute('souhrn', summary);
 
 const viewEl = document.getElementById('view');
 const titleEl = document.getElementById('screen-title');
+const extraEl = document.getElementById('topbar-extra');
 const tabs = document.querySelectorAll('.tab');
 
 init();
@@ -32,8 +37,9 @@ async function init() {
   // Nečekáme na výsledek, jen požádáme (iOS rozhodne samo).
   requestPersistentStorage();
 
-  startRouter(async (name, view) => {
+  startRouter(async (name, view, params) => {
     titleEl.textContent = view.title;
+    extraEl.replaceChildren();
     viewEl.replaceChildren();
     viewEl.scrollTop = 0;
     tabs.forEach((tab) => {
@@ -43,7 +49,7 @@ async function init() {
       else tab.removeAttribute('aria-current');
     });
     try {
-      await view.render(viewEl);
+      await view.render(viewEl, { params, extraEl });
     } catch (err) {
       console.error(err);
       viewEl.innerHTML = `<section class="card"><h2 class="card-title">Něco se pokazilo</h2>

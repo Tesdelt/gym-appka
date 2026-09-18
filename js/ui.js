@@ -16,7 +16,7 @@ export function el(tag, attrs = {}, children = []) {
   return node;
 }
 
-function openDialog(build) {
+export function openDialog(build) {
   return new Promise((resolve) => {
     const dialog = el('dialog', { class: 'dialog' });
     const close = (value) => {
@@ -56,6 +56,27 @@ export function promptText({ title, label = '', value = '', placeholder = '', ok
   });
 }
 
+// Číselná výzva. Vrátí číslo, nebo null při zrušení.
+export function promptNumber({ title, value = 0, step = 'any', min = null, unit = '' }) {
+  return openDialog((close) => {
+    const input = el('input', { type: 'number', class: 'input input-number', value: String(value), step, min, inputmode: step === 1 ? 'numeric' : 'decimal' });
+    const form = el('form', { method: 'dialog', class: 'dialog-body' }, [
+      el('h2', { class: 'dialog-title', text: title }),
+      el('div', { class: 'input-row' }, [input, unit ? el('span', { class: 'input-unit', text: unit }) : null]),
+      el('div', { class: 'dialog-actions' }, [
+        el('button', { type: 'button', class: 'btn', text: 'Zrušit', onclick: () => close(null) }),
+        el('button', { type: 'submit', class: 'btn btn-primary', text: 'Použít' }),
+      ]),
+    ]);
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const n = parseFloat(String(input.value).replace(',', '.'));
+      if (Number.isFinite(n)) close(n);
+    });
+    return form;
+  });
+}
+
 // Potvrzení. Vrátí true/false.
 export function confirmDialog({ title, text = '', okLabel = 'Potvrdit', danger = false }) {
   return openDialog((close) => el('div', { class: 'dialog-body' }, [
@@ -89,6 +110,21 @@ export function formatWeight(kg, { bodyweight = false } = {}) {
   }
   return `${kgFormat.format(kg)} kg`;
 }
+
+// „+15 kg × 8, 8, 7“ / „15 kg × 8 | 12,5 kg × 7“ / „40 s, 45 s“ / „8, 8, 8“
+export function formatValues(entry, values) {
+  if (!values.length) return '–';
+  if (entry.type === 'time') return values.map((v) => `${v.seconds} s`).join(', ');
+  if (entry.type === 'reps') return values.map((v) => v.reps).join(', ');
+  const sameWeight = values.every((v) => v.weight === values[0].weight);
+  const w = (v) => formatWeight(v.weight, { bodyweight: entry.bodyweight });
+  if (sameWeight) return `${w(values[0])} × ${values.map((v) => v.reps).join(', ')}`;
+  return values.map((v) => `${w(v)} × ${v.reps}`).join(' | ');
+}
+
+export const dateShort = new Intl.DateTimeFormat('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' });
+export const dateLong = new Intl.DateTimeFormat('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+export const timeShort = new Intl.DateTimeFormat('cs-CZ', { hour: 'numeric', minute: '2-digit' });
 
 export function formatRest(seconds) {
   if (seconds % 60 === 0) return `${seconds / 60} min`;

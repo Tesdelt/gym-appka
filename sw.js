@@ -1,6 +1,6 @@
 // Service worker: offline cache. Při každém nasazení zvýšit VERSION
 // a nové soubory doplnit do ASSETS.
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 const CACHE = `gym-app-v${VERSION}`;
 
 const ASSETS = [
@@ -16,11 +16,17 @@ const ASSETS = [
   'js/data.js',
   'js/ui.js',
   'js/diagnostics.js',
+  'js/recommend.js',
+  'js/records.js',
+  'js/workout.js',
+  'js/exercisePicker.js',
   'js/views/home.js',
   'js/views/stats.js',
   'js/views/goals.js',
   'js/views/exercises.js',
   'js/views/settings.js',
+  'js/views/workout.js',
+  'js/views/summary.js',
   'fonts/barlow-400-latin-ext.woff2',
   'fonts/barlow-400-latin.woff2',
   'fonts/barlow-500-latin-ext.woff2',

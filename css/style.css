@@ -330,3 +330,117 @@ button.list-main { min-height: var(--tap); }
   z-index: 10;
 }
 .toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- Horní lišta: doplněk (časomíra) ---------- */
+.topbar { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.timer { font-family: var(--font-head); font-weight: 700; font-size: 24px; letter-spacing: 0.04em; color: var(--text-2); }
+
+.section-title {
+  margin: 0 0 10px;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.block { display: block; }
+.gold { color: var(--gold); }
+.row-2 { display: flex; gap: 8px; }
+.row-2 > * { flex: 1 1 0; min-width: 0; }
+
+.btn-hero { flex-direction: column; gap: 2px; }
+.btn-hero-sub { font-family: var(--font-body); font-size: 15px; font-weight: 500; letter-spacing: 0; text-transform: none; opacity: 0.85; }
+
+/* ---------- Domů: historie ---------- */
+.history-btn { display: flex; gap: 12px; align-items: baseline; padding: 0 var(--gutter); }
+.history-date { flex: none; width: 88px; color: var(--text-2); font-weight: 500; }
+.history-name { font-weight: 600; }
+
+/* ---------- Výběr typu tréninku ---------- */
+.choice-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.choice {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  min-height: var(--tap); padding: 8px 12px; text-align: left;
+  background: var(--bg); border: 1px solid var(--border); color: var(--text); cursor: pointer;
+}
+.choice.is-selected { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.choice-title { font-weight: 600; }
+select.input { padding-right: 32px; background-image: none; }
+
+/* ---------- Trénink: aktuální cvik ---------- */
+.card-current { padding: 14px var(--gutter) var(--gutter); transition: box-shadow 0.15s; }
+.card-current.is-confirmed { box-shadow: inset 0 0 0 3px var(--accent); }
+.ex-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+.ex-name { margin: 0; font-family: var(--font-head); font-weight: 800; font-size: 26px; line-height: 1.05; letter-spacing: 0.02em; }
+.ex-set { flex: none; font-family: var(--font-head); font-weight: 700; font-size: 20px; color: var(--text-2); letter-spacing: 0.03em; white-space: nowrap; }
+.ex-media { display: flex; gap: 12px; align-items: stretch; margin-bottom: 12px; }
+.ex-image {
+  flex: none; width: 96px; height: 96px; display: flex; align-items: center; justify-content: center;
+  background: var(--bg); border: 1px solid var(--border); color: var(--border);
+}
+.ex-image svg { width: 56px; height: 56px; }
+.ex-meta { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 4px; }
+.meta-row { display: flex; flex-direction: column; }
+.meta-value { font-weight: 600; font-size: 16px; line-height: 1.25; }
+.ex-meta .btn-small { align-self: flex-start; margin-top: 2px; }
+
+.steppers { display: flex; gap: 10px; margin-bottom: 10px; }
+.stepper { flex: 1 1 0; min-width: 0; }
+.stepper-weight { flex: 1.25 1 0; }
+.stepper-label { margin-bottom: 4px; font-size: 14px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.04em; }
+.stepper-row { display: flex; align-items: stretch; border: 1px solid var(--border); background: var(--bg); }
+.stepper-btn { flex: none; width: 46px; min-height: 64px; border: 0; background: var(--surface); font-size: 30px; font-weight: 500; }
+.stepper-btn:first-child { border-right: 1px solid var(--border); }
+.stepper-btn:last-child { border-left: 1px solid var(--border); }
+.stepper-value {
+  flex: 1 1 auto; min-width: 0; border: 0; background: none; color: var(--text);
+  font-family: var(--font-head); font-weight: 800; font-size: 40px; line-height: 1; letter-spacing: 0;
+  padding: 0 2px; cursor: pointer; overflow: hidden; white-space: nowrap;
+}
+.rest-info { display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid var(--border); }
+.rest-value { font-family: var(--font-head); font-weight: 700; font-size: 22px; letter-spacing: 0.03em; }
+.btn-done { margin-top: 12px; min-height: 68px; }
+
+.note-block { margin-top: 12px; }
+.textarea { min-height: 56px; padding: 10px 12px; resize: vertical; line-height: 1.35; }
+.note-next { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
+.segmented { display: flex; border: 1px solid var(--border); }
+.seg {
+  flex: 1 1 0; min-width: 44px; min-height: 44px; padding: 0 10px;
+  border: 0; border-left: 1px solid var(--border); background: var(--bg); color: var(--text-2); font-weight: 600; cursor: pointer;
+}
+.seg:first-child { border-left: 0; }
+.seg.is-selected { background: var(--accent); color: var(--on-accent); }
+.seg:disabled { cursor: default; }
+
+.card-next { display: flex; flex-direction: column; gap: 2px; padding: 12px var(--gutter); }
+.next-name { font-weight: 600; font-size: 18px; }
+.card-done { border-color: var(--accent); }
+
+/* seznam cviků v tréninku */
+.ex-row.is-current { box-shadow: inset 3px 0 0 var(--accent); padding-left: 10px; }
+.row-actions { display: flex; gap: 6px; margin-top: 4px; }
+.row-actions .btn { flex: 1 1 0; padding: 0 6px; }
+.ex-row .list-main { min-height: 0; }
+.is-done { color: var(--gold); }
+.picker-list { max-height: 50vh; overflow-y: auto; margin-top: 10px; }
+.input-row { display: flex; align-items: center; gap: 8px; }
+.input-number { font-family: var(--font-head); font-weight: 700; font-size: 28px; min-height: 56px; }
+.input-unit { color: var(--text-2); }
+
+/* ---------- Souhrn ---------- */
+.card-gold { border-color: var(--gold); }
+.plain-list { list-style: none; margin: 0; padding: 0; }
+.plain-list > li + li { margin-top: 8px; }
+.cmp { display: flex; gap: 10px; align-items: flex-start; }
+.cmp-mark { flex: none; width: 22px; font-family: var(--font-head); font-weight: 800; font-size: 22px; line-height: 1.1; }
+.cmp-up .cmp-mark { color: var(--gold); }
+.cmp-down .cmp-mark { color: var(--danger); }
+.cmp-same .cmp-mark { color: var(--text-2); }
+.sum-ex + .sum-ex { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.sum-sets > li + li { margin-top: 2px; }
+.scale-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.scale-label { font-weight: 600; }
+.scale-row .segmented { flex: 0 0 auto; width: 220px; }
+.card .textarea { margin-top: 6px; }

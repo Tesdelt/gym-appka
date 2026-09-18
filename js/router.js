@@ -8,14 +8,19 @@ export function addRoute(name, view) {
 }
 
 export function currentRoute() {
-  const name = location.hash.replace(/^#\/?/, '').split('/')[0];
-  return routes.has(name) ? name : fallback;
+  const parts = location.hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent);
+  const name = routes.has(parts[0]) ? parts[0] : fallback;
+  return { name, params: routes.has(parts[0]) ? parts.slice(1) : [] };
+}
+
+export function navigate(path) {
+  location.hash = `#/${path}`;
 }
 
 export function startRouter(onChange) {
   const handle = () => {
-    const name = currentRoute();
-    onChange(name, routes.get(name));
+    const { name, params } = currentRoute();
+    onChange(name, routes.get(name), params);
   };
   window.addEventListener('hashchange', handle);
   handle();
