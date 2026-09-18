@@ -12,6 +12,7 @@ import {
 import { el, toast, confirmDialog, formatValues, formatWeight, dateShort } from '../ui.js';
 import { navigate } from '../router.js';
 import { listDoneWorkouts, buildEntry } from '../workout.js';
+import { listGoals } from '../goals.js';
 import { computeRecords, recordKey } from '../records.js';
 import { slotsOf } from '../recommend.js';
 import { lineChart } from '../chart.js';
@@ -54,7 +55,7 @@ function goBack() {
 
 // ---------- Detail ----------
 async function renderDetail(container, exercise) {
-  const [done, gyms, templates, lastGymId] = await Promise.all([listDoneWorkouts(), listGyms(), listTemplates(), getLastGymId()]);
+  const [done, gyms, templates, lastGymId, goals] = await Promise.all([listDoneWorkouts(), listGyms(), listTemplates(), getLastGymId(), listGoals()]);
   const records = computeRecords(done);
   let gymId = lastGymId ?? gyms[0]?.id;
 
@@ -121,7 +122,7 @@ async function renderDetail(container, exercise) {
   const drawProgress = () => {
     const item = templates.flatMap((t) => t.exercises).find((e) => e.exerciseId === exercise.id)
       ?? { mode: 'sets', sets: [{ weight: 0, reps: 10, seconds: 30, rest: 180 }], repRange: null, weightStep: null };
-    const entry = buildEntry(item, exercise, gymId, done);
+    const entry = buildEntry(item, exercise, gymId, done, goals);
     const rec = records.get(recordKey({ exerciseId: exercise.id, perGym: exercise.perGym }, gymId));
     const chartData = historyPoints(done, exercise, gymId);
 
@@ -133,7 +134,7 @@ async function renderDetail(container, exercise) {
       }))) : null,
       el('dl', { class: 'kv' }, [
         kv(entry.last ? `Minule (${dateShort.format(new Date(entry.last.date))})` : 'Minule', entry.last ? formatValues(entry, entry.last.values) : 'zatím necvičeno'),
-        kv('Doporučení teď', entry.rec?.length ? formatValues(entry, entry.rec) : '–'),
+        kv(entry.goal?.applied ? 'Doporučení teď (podle cíle)' : 'Doporučení teď', entry.rec?.length ? formatValues(entry, entry.rec) : '–'),
         kv('Osobní rekord', recordText(exercise, rec), true),
       ]),
       el('h4', { class: 'sub-title', text: chartTitle(exercise) }),

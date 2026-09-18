@@ -117,7 +117,7 @@ function currentCard(workout, cur, ctx) {
     ]),
     el('div', { class: 'ex-meta' }, [
       metaRow(entry.last ? `Minule ${dateShort.format(new Date(entry.last.date))}` : 'Minule', entry.last ? formatValues(entry, entry.last.values) : 'poprvé'),
-      metaRow('Doporučení', rec ? formatValues(entry, [rec]) : '–'),
+      metaRow(entry.goal?.applied ? 'Doporučení podle cíle' : 'Doporučení', rec ? formatValues(entry, [rec]) : '–'),
     ]),
   ]));
 
@@ -143,15 +143,6 @@ function currentCard(workout, cur, ctx) {
     }));
   }
   card.append(el('div', { class: 'steppers' }, steppers.map((s) => s.root)));
-  // Obě čísla stejně velká: velikost podle nejdelší hodnoty
-  const fitNumbers = () => {
-    const longest = Math.max(...steppers.map((s) => s.text().length));
-    const size = longest > 4 ? '28px' : longest > 3 ? '34px' : '';
-    steppers.forEach((s) => { s.num.style.fontSize = size; });
-  };
-  steppers.forEach((s) => { s.onChange = fitNumbers; });
-  fitNumbers();
-
   // Doporučení + pauza
   card.append(el('div', { class: 'row-2' }, [
     el('button', {
@@ -242,9 +233,9 @@ function weightDisplay(kg, bodyweight) {
 }
 
 function stepper({ label, unit, value, display, step, min, set, editTitle, intStep = false }) {
-  const api = { onChange: null };
+  const api = {};
   const num = el('button', { type: 'button', class: 'stepper-value', 'aria-label': `${label}: upravit` });
-  const refresh = () => { num.textContent = display(); api.onChange?.(); };
+  const refresh = () => { num.textContent = display(); };
   refresh();
   const change = (delta) => {
     let v = Math.round((value() + delta) * 100) / 100;
@@ -257,7 +248,6 @@ function stepper({ label, unit, value, display, step, min, set, editTitle, intSt
     if (v != null) { set(v); refresh(); }
   });
   api.num = num;
-  api.text = display;
   api.root = el('div', { class: 'stepper' }, [
     el('div', { class: 'stepper-label' }, [el('span', { text: label }), unit ? el('span', { class: 'muted', text: ` ${unit}` }) : null]),
     el('div', { class: 'stepper-row' }, [

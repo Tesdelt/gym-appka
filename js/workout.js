@@ -14,6 +14,7 @@
 import { getAll, get, put, remove, newId } from './db.js';
 import { getExercise, getTemplate, weightStepFor, setLastGymId } from './data.js';
 import { rangeFor, recommendSets, recommendDropset, slotsOf } from './recommend.js';
+import { listGoals, activeGoalFor, evaluateGoal, goalDelta } from './goals.js';
 
 // ---------- Načtení ----------
 export async function getActiveWorkout() {
@@ -52,12 +53,12 @@ export function findLastEntry(doneWorkouts, exerciseId, perGym, gymId, before = 
 // ---------- Vytvoření ----------
 export async function startWorkout(templateId, gymId, gymName) {
   const template = await getTemplate(templateId);
-  const done = await listDoneWorkouts();
+  const [done, goals] = await Promise.all([listDoneWorkouts(), listGoals()]);
   const exercises = [];
   for (const item of template.exercises) {
     const exercise = await getExercise(item.exerciseId);
     if (!exercise) continue;
-    exercises.push(buildEntry(item, exercise, gymId, done));
+    exercises.push(buildEntry(item, exercise, gymId, done, goals));
   }
   const workout = {
     id: newId(),
@@ -89,7 +90,7 @@ function slotFrom(templateSet, range, rest, exercise) {
 
 // Sestaví záznam cviku ze šablony, předvyplní hodnoty z posledního tréninku
 // a spočítá doporučení.
-export function buildEntry(item, exercise, gymId, doneWorkouts) {
+export function buildEntry(item, exercise, gymId, doneWorkouts, goals = []) {
   const last = findLastEntry(doneWorkouts, exercise.id, exercise.perGym, gymId);
   const entry = {
     uid: newId(),
@@ -119,6 +120,7 @@ export function buildEntry(item, exercise, gymId, doneWorkouts) {
       }
     }
     entry.rec = recommendDropset(entry, last?.entry ?? null);
+    applyGoal(entry, exercise, gymId, last, doneWorkouts, goals);
     if (isExplicitChoice(last)) {
       for (const round of entry.rounds) round.steps.forEach((slot, i) => applyValues(slot, entry.rec[i]));
     }
@@ -129,6 +131,7 @@ export function buildEntry(item, exercise, gymId, doneWorkouts) {
       entry.sets.forEach((slot, i) => prefill(slot, lastDone[Math.min(i, lastDone.length - 1)]));
     }
     entry.rec = recommendSets(entry, last?.entry ?? null);
+    applyGoal(entry, exercise, gymId, last, doneWorkouts, goals);
     if (isExplicitChoice(last)) entry.sets.forEach((slot, i) => applyValues(slot, entry.rec[i]));
   }
 
@@ -140,6 +143,31 @@ export function buildEntry(item, exercise, gymId, doneWorkouts) {
     };
   }
   return entry;
+}
+
+// Aktivní cíl přebije běžná pravidla doporučení (kromě výslovné volby
+// „Snížit“ z minula, ta má přednost kvůli bezpečnosti).
+function applyGoal(entry, exercise, gymId, last, doneWorkouts, goals) {
+  const goal = activeGoalFor(goals, exercise, gymId);
+  if (!goal) return;
+  const state = evaluateGoal(goal, doneWorkouts);
+  entry.goal = { id: goal.id, metric: goal.metric, target: goal.target, sessionsLeft: state.sessionsLeft };
+  if (!last || last.entry.next === 'less') return;
+  const d = goalDelta(goal, state, last.entry, entry.weightStep);
+  if (!d) return;
+  const lastSlots = entry.mode === 'dropset'
+    ? last.entry.rounds[last.entry.rounds.length - 1].steps
+    : slotsOf(last.entry).filter((s) => s.done);
+  entry.rec = entry.rec.map((_, i) => {
+    const ref = lastSlots[Math.min(i, lastSlots.length - 1)];
+    const v = { weight: ref.weight, reps: ref.reps, seconds: ref.seconds };
+    if (d.metric === 'weight') v.weight = Math.round((ref.weight + d.delta) * 100) / 100;
+    if (d.metric === 'reps') v.reps = (ref.reps ?? 0) + d.delta;
+    if (d.metric === 'seconds') v.seconds = (ref.seconds ?? 0) + d.delta;
+    if (entry.type === 'reps') delete v.weight;
+    return v;
+  });
+  entry.goal.applied = true;
 }
 
 // Volba „Přidat“ / „Snížit“ z minula se provede rovnou: hodnoty se předvyplní
@@ -167,7 +195,7 @@ function prefill(slot, ref) {
 // Záznam pro cvik přidaný během tréninku (mimo šablonu): sady ze šablony,
 // kde se cvik vyskytuje, jinak výchozí 3 série.
 export async function buildAdHocEntry(exercise, gymId, templates) {
-  const done = await listDoneWorkouts();
+  const [done, goals] = await Promise.all([listDoneWorkouts(), listGoals()]);
   let item = null;
   for (const t of templates) {
     item = t.exercises.find((e) => e.exerciseId === exercise.id);
@@ -177,7 +205,7 @@ export async function buildAdHocEntry(exercise, gymId, templates) {
     const base = exercise.type === 'time' ? { weight: 0, seconds: 30, rest: 180 } : { weight: 0, reps: 10, rest: 180 };
     item = { mode: 'sets', sets: [base, base, base], repRange: null, weightStep: null };
   }
-  return buildEntry(item, exercise, gymId, done);
+  return buildEntry(item, exercise, gymId, done, goals);
 }
 
 // ---------- Pozice v tréninku ----------

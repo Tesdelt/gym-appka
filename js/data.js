@@ -119,3 +119,33 @@ export const EQUIPMENT_LABEL = {
   machine: 'stroj',
   other: 'jiné',
 };
+
+// ---------- Tělesné míry ----------
+// Druhy měr (uživatel si další přidá v kroku 7), záznamy { id, kind, value, date, note }
+const DEFAULT_MEASURE_KINDS = [
+  { key: 'vaha', name: 'Tělesná váha', unit: 'kg' },
+  { key: 'biceps', name: 'Obvod bicepsu', unit: 'cm' },
+];
+
+export async function listMeasureKinds() {
+  return getMeta('measureKinds', DEFAULT_MEASURE_KINDS);
+}
+
+export function saveMeasureKinds(kinds) {
+  return setMeta('measureKinds', kinds);
+}
+
+export async function listMeasurements() {
+  const list = await getAll('measurements');
+  return list.sort((a, b) => b.date.localeCompare(a.date));
+}
+
+export async function addMeasurement(kind, value, date = new Date().toISOString(), note = '') {
+  const row = { id: newId(), kind, value, date, note };
+  await put('measurements', row);
+  return row;
+}
+
+export function deleteMeasurement(id) {
+  return remove('measurements', id);
+}

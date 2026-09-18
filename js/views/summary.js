@@ -5,6 +5,8 @@ import { el, toast, confirmDialog, openDialog, promptText, formatValues, dateLon
 import { navigate } from '../router.js';
 import { slotsOf } from '../recommend.js';
 import { findNewRecords } from '../records.js';
+import { listGoals, evaluateGoal, markReachedGoals } from '../goals.js';
+import { exerciseMap, listMeasurements } from '../data.js';
 import {
   getActiveWorkout, getWorkout, listDoneWorkouts, finishWorkout, saveWorkout, deleteWorkout,
   elapsedSeconds, formatDurationLong, compareWithPrevious, slotLabel,
@@ -69,6 +71,32 @@ async function drawSummary(container, workout, id, state, redraw) {
         ]);
       })),
     ]));
+  }
+
+  // Cíle: splněné nebo posunuté tímto tréninkem (jen při ukončení)
+  if (workout.status === 'active') {
+    const [goals, exercises] = await Promise.all([listGoals(), exerciseMap()]);
+    const asDone = { ...workout, status: 'done' };
+    const rows = [];
+    for (const g of goals) {
+      if (g.kind !== 'exercise' || g.status !== 'active') continue;
+      if (!workout.exercises.some((e) => e.exerciseId === g.exerciseId)) continue;
+      const before = evaluateGoal(g, previousAll);
+      const after = evaluateGoal(g, [asDone, ...previousAll]);
+      const name = exercises.get(g.exerciseId)?.name ?? '';
+      if (after.reached) rows.push(el('li', { class: 'gold' }, [el('strong', { text: name }), el('span', { text: ' – cíl splněn!' })]));
+      else if (after.progress > before.progress) {
+        rows.push(el('li', {}, [el('strong', { text: name }), el('span', { class: 'muted', text: ` – cíl posunut ${Math.round(before.progress * 100)} % → ${Math.round(after.progress * 100)} %` })]));
+      } else {
+        rows.push(el('li', {}, [el('strong', { text: name }), el('span', { class: 'muted', text: ` – cíl beze změny (${Math.round(after.progress * 100)} %)` })]));
+      }
+    }
+    if (rows.length) {
+      stack.append(el('section', { class: `card ${rows.some((r) => r.classList.contains('gold')) ? 'card-gold' : ''}` }, [
+        el('h2', { class: 'card-title', text: 'Cíle' }),
+        el('ul', { class: 'plain-list' }, rows),
+      ]));
+    }
   }
 
   // Porovnání
@@ -151,7 +179,9 @@ async function drawSummary(container, workout, id, state, redraw) {
         text: 'Uložit trénink',
         onclick: async () => {
           await finishWorkout(workout, { scales, comment: comment.value.trim() });
-          toast('Trénink uložen');
+          const [goals, all, measurements] = await Promise.all([listGoals(), listDoneWorkouts(), listMeasurements()]);
+          const reached = await markReachedGoals(goals, all, measurements);
+          toast(reached.length ? 'Trénink uložen, cíl splněn!' : 'Trénink uložen');
           navigate('domu');
         },
       }),
