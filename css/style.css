@@ -351,6 +351,7 @@ button.list-main { min-height: var(--tap); }
 .dialog-body p { margin: 0 0 12px; }
 .dialog-actions { display: flex; gap: 8px; margin-top: 16px; }
 .dialog-actions .btn { flex: 1 1 0; }
+.dialog-actions.is-tight .btn { padding: 0 8px; white-space: nowrap; }
 
 /* ---------- Oznámení ---------- */
 .toast {

@@ -156,14 +156,22 @@ export async function snoozeBackupReminder(days = 3) {
   await setMeta('backupSnoozeUntil', new Date(Date.now() + days * 86400000).toISOString());
 }
 
-// ---------- Import historie (sloučení, nic nepřepisuje) ----------
+// ---------- Import historie (sloučení) ----------
 // Soubor: { app: 'gym-appka', kind: 'history', exercises: [...], workouts: [...] }
-// Přidá tréninky a chybějící cviky; co už v appce je (stejné id), přeskočí.
+// Přidá tréninky a chybějící cviky. Trénink se stejným id (z dřívějšího importu
+// téhož souboru) přeskočí, s replace: true ho nahradí verzí ze souboru.
 export function isHistoryFile(data) {
   return data?.app === 'gym-appka' && data?.kind === 'history' && Array.isArray(data.workouts);
 }
 
-export async function importHistory(data) {
+// Kolik tréninků ze souboru už v appce je
+export async function historyOverlap(data) {
+  const ids = new Set((await getAll('workouts')).map((w) => w.id));
+  const existing = data.workouts.filter((w) => ids.has(w.id)).length;
+  return { total: data.workouts.length, existing, fresh: data.workouts.length - existing };
+}
+
+export async function importHistory(data, { replace = false } = {}) {
   const db = await openDB();
   const [existingEx, existingW, gyms] = await Promise.all([getAll('exercises'), getAll('workouts'), getAll('gyms')]);
   const norm = (x) => String(x ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -180,7 +188,7 @@ export async function importHistory(data) {
     if (same) remap.set(ex.id, same);
     else newExercises.push(ex);
   }
-  const workouts = data.workouts.filter((w) => !wIds.has(w.id)).map((w) => {
+  const workouts = data.workouts.filter((w) => replace || !wIds.has(w.id)).map((w) => {
     const gym = gyms.find((g) => g.id === w.gymId);
     return {
       ...w,
@@ -199,5 +207,6 @@ export async function importHistory(data) {
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error ?? new Error('Import zrušen'));
   });
-  return { exercises: newExercises.length, workouts: workouts.length, skipped: data.workouts.length - workouts.length };
+  const replaced = workouts.filter((w) => wIds.has(w.id)).length;
+  return { exercises: newExercises.length, workouts: workouts.length - replaced, replaced, skipped: data.workouts.length - workouts.length };
 }

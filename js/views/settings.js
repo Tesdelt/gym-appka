@@ -3,11 +3,11 @@
 import {
   listGyms, addGym, renameGym, deleteGym, listTemplates, addTemplate, reorderTemplates, colorAttrs,
 } from '../data.js';
-import { el, promptText, confirmDialog, toast, plural, dragHandle, makeSortable, dateShort } from '../ui.js';
+import { el, promptText, confirmDialog, openDialog, toast, plural, dragHandle, makeSortable, dateShort } from '../ui.js';
 import { navigate } from '../router.js';
 import { renderDiagnostics } from '../diagnostics.js';
 import { getTheme, setTheme } from '../theme.js';
-import { shareBackup, pickBackupFile, inspectBackup, importData, backupStatus, isHistoryFile, importHistory } from '../backup.js';
+import { shareBackup, pickBackupFile, inspectBackup, importData, backupStatus, isHistoryFile, historyOverlap, importHistory } from '../backup.js';
 import { t, lang, setLang } from '../i18n.js';
 
 export const title = t('Nastavení');
@@ -161,18 +161,33 @@ async function renderBackup(card) {
           if (!data) return;
           if (data.error) { toast(data.error); return; }
           if (isHistoryFile(data)) {
-            // historie z poznámek: jen se přidá, nic se nepřepisuje
-            const ok = await confirmDialog({
-              title: t('Přidat historii tréninků?'),
-              text: t('Soubor obsahuje {workouts}. Přidají se k současným datům, nic se nepřepíše.', {
-                workouts: plural(data.workouts.length, ['trénink', 'tréninky', 'tréninků'], ['workout', 'workouts']),
-              }),
-              okLabel: t('Přidat'),
-            });
-            if (!ok) return;
+            // historie z poznámek: přidá se k současným datům; tréninky
+            // z dřívějšího importu téhož souboru jde nahradit novou verzí
+            const workoutsN = (n) => plural(n, ['trénink', 'tréninky', 'tréninků'], ['workout', 'workouts']);
+            const overlap = await historyOverlap(data);
+            const choice = overlap.existing === 0
+              ? (await confirmDialog({
+                title: t('Přidat historii tréninků?'),
+                text: t('Soubor obsahuje {workouts}. Přidají se k současným datům, nic se nepřepíše.', { workouts: workoutsN(overlap.total) }),
+                okLabel: t('Přidat'),
+              }) ? 'add' : null)
+              : await openDialog((close) => el('div', { class: 'dialog-body' }, [
+                el('h2', { class: 'dialog-title', text: t('Přidat historii tréninků?') }),
+                el('p', { class: 'muted', text: t('Soubor obsahuje {workouts}, z toho {existing} už v appce máš z dřívějšího importu. Nahradit je verzí ze souboru? Tvoje ruční úpravy v nich se ztratí.', {
+                  workouts: workoutsN(overlap.total), existing: overlap.existing,
+                }) }),
+                el('div', { class: 'dialog-actions is-tight' }, [
+                  el('button', { type: 'button', class: 'btn', text: t('Zrušit'), onclick: () => close(null) }),
+                  overlap.fresh > 0 ? el('button', { type: 'button', class: 'btn', text: t('Jen nové'), onclick: () => close('add') }) : null,
+                  el('button', { type: 'button', class: 'btn btn-primary', text: t('Nahradit'), onclick: () => close('replace') }),
+                ]),
+              ]));
+            if (!choice) return;
             try {
-              const res = await importHistory(data);
-              toast(t('Přidáno: {n}', { n: plural(res.workouts, ['trénink', 'tréninky', 'tréninků'], ['workout', 'workouts']) }));
+              const res = await importHistory(data, { replace: choice === 'replace' });
+              toast(res.replaced
+                ? t('Přidáno: {n}, nahrazeno: {m}', { n: workoutsN(res.workouts), m: res.replaced })
+                : t('Přidáno: {n}', { n: workoutsN(res.workouts) }));
               setTimeout(() => { location.hash = '#/domu'; location.reload(); }, 800);
             } catch (err) {
               console.error(err);
