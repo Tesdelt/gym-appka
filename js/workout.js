@@ -14,7 +14,7 @@
 import { getAll, get, put, remove, newId } from './db.js';
 import { getExercise, getTemplate, weightStepFor, setLastGymId, defaultRest } from './data.js';
 import { rangeFor, recommendSets, recommendDropset, slotsOf, round5, isWork, workSlots } from './recommend.js';
-import { listGoals, activeGoalFor, evaluateGoal, goalDelta } from './goals.js';
+import { listGoals, activeGoalFor, evaluateGoal, goalAdjust } from './goals.js';
 import { t } from './i18n.js';
 
 // ---------- Načtení ----------
@@ -152,19 +152,17 @@ function applyGoal(entry, exercise, gymId, last, doneWorkouts, goals) {
   const goal = activeGoalFor(goals, exercise, gymId);
   if (!goal) return;
   const state = evaluateGoal(goal, doneWorkouts);
-  entry.goal = { id: goal.id, metric: goal.metric, target: goal.target, sessionsLeft: state.sessionsLeft };
+  entry.goal = { id: goal.id };
   if (!last || last.entry.next === 'less') return;
-  const d = goalDelta(goal, state, last.entry, entry.weightStep);
-  if (!d) return;
+  const adjust = goalAdjust(goal, state, last.entry, entry.weightStep ?? 2.5);
+  if (!adjust) return;
   const lastSlots = entry.mode === 'dropset'
     ? last.entry.rounds[last.entry.rounds.length - 1].steps
     : workSlots(last.entry);
   entry.rec = entry.rec.map((_, i) => {
     const ref = lastSlots[Math.min(i, lastSlots.length - 1)];
-    const v = { weight: ref.weight, reps: ref.reps, seconds: ref.seconds };
-    if (d.metric === 'weight') v.weight = Math.round((ref.weight + d.delta) * 100) / 100;
-    if (d.metric === 'reps') v.reps = (ref.reps ?? 0) + d.delta;
-    if (d.metric === 'seconds') v.seconds = round5((ref.seconds ?? 0) + d.delta);
+    const v = { weight: ref.weight, reps: ref.reps, seconds: ref.seconds, ...adjust(ref) };
+    if (v.seconds != null) v.seconds = round5(v.seconds);
     if (entry.type === 'reps') delete v.weight;
     return v;
   });

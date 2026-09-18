@@ -1,13 +1,15 @@
 // Obrazovka Cíle: aktivní a splněné cíle, nový cíl.
 
-import { el, openDialog, confirmDialog, promptNumber, toast, plural, formatWeight, dateShort } from '../ui.js';
+import { el, openDialog, confirmDialog, promptNumber, toast, plural, formatWeight, dateShort, stepField } from '../ui.js';
 import { navigate } from '../router.js';
 import { countUp } from '../fx.js';
 import { exerciseMap, listGyms, getLastGymId, listMeasureKinds, listMeasurements, addMeasurement, kindName } from '../data.js';
 import { listDoneWorkouts } from '../workout.js';
+import { listManualRecords, manualAsWorkouts } from '../stats.js';
 import { pickExercise } from '../exercisePicker.js';
 import {
-  listGoals, saveGoal, deleteGoal, newGoal, evaluateGoal, metricsFor, currentBaseline, markReachedGoals, daysLeft,
+  listGoals, saveGoal, deleteGoal, newGoal, evaluateGoal, markReachedGoals, targetFields, goalTarget,
+  cleanSets, bestSoFar, goalStartFrom, DURATIONS, dueDateAfter,
 } from '../goals.js';
 import { t, locale, exName } from '../i18n.js';
 
@@ -30,7 +32,7 @@ export async function render(container, { extraEl }) {
         ? el('div', { class: 'stack' }, active.map((g) => goalCard(g, ctx)))
         : el('section', { class: 'card' }, [
           el('h2', { class: 'card-title', text: t('Žádný aktivní cíl') }),
-          el('p', { class: 'muted small', text: t('Cíl u cviku ovlivní doporučení v tréninku: zbývající přírůstek se rozpočítá na zbývající tréninky.') }),
+          el('p', { class: 'muted small', text: t('Cíl u cviku ovlivní doporučení v tréninku: zbývající kus cesty se rozpočítá na tréninky do termínu.') }),
           el('button', { type: 'button', class: 'btn btn-primary', text: t('+ Nový cíl'), onclick: () => createGoal(redraw) }),
         ]),
       finished.length ? el('h2', { class: 'section-title gold', text: t('Splněné') }) : null,
@@ -49,25 +51,25 @@ function goalCard(goal, ctx) {
 
   if (goal.kind === 'exercise') {
     const ex = ctx.exercises.get(goal.exerciseId);
-    const fmt = valueFormatter(goal.metric, ex);
+    const target = goalTarget(goal);
     const gym = goal.gymId ? ctx.gyms.find((g) => g.id === goal.gymId)?.name : null;
     heading = ex ? exName(ex) : t('Smazaný cvik');
     detail = [
-      `${fmt(goal.baseline)} → ${fmt(goal.target)}`,
-      done ? null : t('teď {value}', { value: fmt(state.current) }),
-      done ? null : state.sessionsLeft > 0 ? t('zbývá {n}', { n: plural(state.sessionsLeft, ['trénink', 'tréninky', 'tréninků'], ['workout', 'workouts']) }) : t('termín vypršel'),
+      t('cíl {value}', { value: formatSet(target, ex) }),
+      !done && state.best ? t('teď {value}', { value: formatSet(state.best, ex, Object.keys(target)) }) : null,
+      done ? null : goal.dueDate ? timeLeft(state.daysLeft)
+        : state.sessionsLeft > 0 ? t('zbývá {n}', { n: plural(state.sessionsLeft, ['trénink', 'tréninky', 'tréninků'], ['workout', 'workouts']) }) : t('termín vypršel'),
       gym,
     ].filter(Boolean).join(' · ');
     if (ex) actions.push(el('button', { type: 'button', class: 'btn btn-small', text: t('Cvik'), onclick: () => navigate(`cvik/${encodeURIComponent(ex.id)}`) }));
   } else {
     const kind = ctx.kinds.find((k) => k.key === goal.measureKey) ?? { name: goal.measureKey, unit: '' };
-    const fmt = (v) => (v == null ? '–' : `${num(v)} ${kind.unit}`);
-    const days = daysLeft(goal.dueDate);
+    const fmt = (v) => `${num(v)} ${kind.unit}`;
     heading = kindName(kind);
     detail = [
-      `${fmt(state.start)} → ${fmt(goal.target)}`,
-      done ? null : t('teď {value}', { value: fmt(state.current) }),
-      !done && goal.dueDate ? (days >= 0 ? t('do {date} ({days})', { date: dateShort.format(new Date(goal.dueDate)), days: plural(days, ['den', 'dny', 'dní'], ['day', 'days']) }) : t('termín vypršel')) : null,
+      t('cíl {value}', { value: fmt(goal.target) }),
+      done ? null : state.current != null ? t('teď {value}', { value: fmt(state.current) }) : t('zatím bez záznamu'),
+      !done && goal.dueDate ? timeLeft(state.daysLeft) : null,
     ].filter(Boolean).join(' · ');
     if (!done) {
       actions.push(el('button', {
@@ -119,10 +121,52 @@ function numPlain(v) {
   return new Intl.NumberFormat(locale, { maximumFractionDigits: 2, useGrouping: false }).format(v);
 }
 
-function valueFormatter(metric, exercise) {
-  if (metric === 'weight') return (v) => (v == null ? '–' : formatWeight(v, { bodyweight: exercise?.bodyweight }));
-  if (metric === 'seconds') return (v) => (v == null ? '–' : `${v} s`);
-  return (v) => (v == null ? '–' : t('{n} opak.', { n: v }));
+// Série jako text: „+40 kg × 8“, „12 opak.“, „60 s“ (jen části `fields`)
+function formatSet(set, exercise, fields = Object.keys(set)) {
+  const has = (k) => fields.includes(k) && set[k] != null;
+  if (has('seconds')) return `${set.seconds} s`;
+  const w = has('weight') ? formatWeight(set.weight, { bodyweight: exercise?.bodyweight }) : null;
+  if (w && has('reps')) return `${w} × ${set.reps}`;
+  return w ?? t('{n} opak.', { n: set.reps });
+}
+
+const WEEK = [['týden', 'týdny', 'týdnů'], ['week', 'weeks']];
+const MONTH = [['měsíc', 'měsíce', 'měsíců'], ['month', 'months']];
+
+// Zbývající čas: dny, do 4 týdnů týdny, pak měsíce
+function timeLeft(days) {
+  if (days < 0) return t('termín vypršel');
+  if (days === 0) return t('poslední den');
+  if (days < 7) return t('zbývá {n}', { n: plural(days, ['den', 'dny', 'dní'], ['day', 'days']) });
+  const weeks = Math.round(days / 7);
+  if (weeks <= 4) return t('zbývá {n}', { n: plural(weeks, ...WEEK) });
+  return t('zbývá {n}', { n: plural(Math.max(1, Math.round(days / 30.44)), ...MONTH) });
+}
+
+// Volba termínu +/−: 1–4 týdny, pak 2–12 měsíců (u měr i „bez termínu“)
+function durationField(initial, { optional = false } = {}) {
+  const options = optional ? [null, ...DURATIONS] : DURATIONS;
+  let i = Math.max(0, options.findIndex((d) => d && d.n === initial.n && d.unit === initial.unit));
+  const text = el('span', { class: 'edit-field duration-value' });
+  const minus = el('button', { type: 'button', class: 'btn stepper-btn', text: '−', 'aria-label': t('Kratší doba'), onclick: () => { i = Math.max(0, i - 1); draw(); } });
+  const plus = el('button', { type: 'button', class: 'btn stepper-btn', text: '+', 'aria-label': t('Delší doba'), onclick: () => { i = Math.min(options.length - 1, i + 1); draw(); } });
+  const draw = () => {
+    const d = options[i];
+    text.replaceChildren(
+      d ? plural(d.n, ...(d.unit === 'week' ? WEEK : MONTH)) : t('bez termínu'),
+      d ? el('small', { text: t('do {date}', { date: dateShort.format(new Date(`${dueDateAfter(d)}T00:00:00`)) }) }) : '',
+    );
+    minus.disabled = i === 0;
+    plus.disabled = i === options.length - 1;
+  };
+  draw();
+  return {
+    root: el('div', { class: 'edit-row' }, [
+      el('span', { class: 'field-label', text: t('Za jakou dobu') }),
+      el('div', { class: 'stepper-row edit-stepper' }, [minus, text, plus]),
+    ]),
+    dueDate: () => (options[i] ? dueDateAfter(options[i]) : null),
+  };
 }
 
 // ---------- Nový cíl ----------
@@ -132,11 +176,11 @@ async function createGoal(redraw) {
     el('div', { class: 'choice-list' }, [
       el('button', { type: 'button', class: 'choice', onclick: () => close('exercise') }, [
         el('span', { class: 'choice-title', text: t('U cviku') }),
-        el('span', { class: 'muted small', text: t('Za X tréninků o Y kg, opakování nebo sekund víc.') }),
+        el('span', { class: 'muted small', text: t('Přesná váha a opakování do zvoleného termínu, např. shyb +40 kg × 8 do 2 měsíců.') }),
       ]),
       el('button', { type: 'button', class: 'choice', onclick: () => close('measure') }, [
         el('span', { class: 'choice-title', text: t('Tělesná míra') }),
-        el('span', { class: 'muted small', text: t('Tělesná váha, obvod bicepsu… volitelně do data.') }),
+        el('span', { class: 'muted small', text: t('Tělesná váha, obvod bicepsu… volitelně s termínem.') }),
       ]),
     ]),
     el('div', { class: 'dialog-actions' }, [el('button', { type: 'button', class: 'btn', text: t('Zrušit'), onclick: () => close(null) })]),
@@ -152,36 +196,35 @@ const parse = (input) => parseFloat(String(input.value).replace(',', '.').replac
 async function createExerciseGoal() {
   const exercise = await pickExercise({ title: t('Cíl u cviku'), catalog: false });
   if (!exercise) return;
-  const [done, gyms, lastGymId] = await Promise.all([listDoneWorkouts(), listGyms(), getLastGymId()]);
-  const metrics = metricsFor(exercise);
+  const [done, manual, exercises, gyms, lastGymId] = await Promise.all([listDoneWorkouts(), listManualRecords(), exerciseMap(), listGyms(), getLastGymId()]);
+  const history = [...done, ...manualAsWorkouts(manual.filter((m) => m.exerciseId === exercise.id), exercises)];
+  const fields = targetFields(exercise);
 
   const goal = await openDialog((close) => {
-    let metric = metrics[0];
     let gymId = exercise.perGym ? (lastGymId ?? gyms[0]?.id) : null;
-    const gain = decimalInput(metric === 'weight' ? (exercise.weightStep ?? 2.5) * 2 : metric === 'seconds' ? 15 : 2);
-    const sessions = el('input', { type: 'text', class: 'input', inputmode: 'numeric', value: '6', autocomplete: 'off' });
-    const baseline = decimalInput(null);
+    const step = exercise.weightStep ?? 2.5;
+    const weight = fields.includes('weight')
+      ? stepField(exercise.bodyweight ? t('Přidaná váha (kg)') : t('Váha (kg)'), null, step, exercise.bodyweight ? null : 0) : null;
+    const reps = fields.includes('reps') ? stepField(t('Opakování'), null, 1, 1) : null;
+    const seconds = fields.includes('seconds') ? stepField(t('Výdrž (s)'), null, 5, 5) : null;
+    const duration = durationField({ n: 4, unit: 'week' });
     const info = el('p', { class: 'muted small' });
-    const gainLabel = el('span', { class: 'field-label' });
+    const sets = () => cleanSets(history, exercise.id, gymId);
 
+    // informace o dosavadním maximu a předvyplnění hodnot nejtěžší sérií
     const refresh = () => {
-      const base = currentBaseline(done, exercise.id, gymId, metric);
-      const fmt = valueFormatter(metric, exercise);
-      baseline.closest('.field')?.toggleAttribute('hidden', base != null);
-      baseline.dataset.auto = base == null ? '' : String(base);
-      info.textContent = base != null ? t('Teď (poslední trénink): {value}', { value: fmt(base) }) : t('Cvik zatím nemáš odcvičený, zadej výchozí hodnotu.');
-      gainLabel.textContent = t('O kolik víc ({unit})', { unit: metric === 'weight' ? 'kg' : metric === 'seconds' ? 's' : t('opakování') });
+      const best = bestSoFar(sets(), exercise);
+      const top = best?.heaviest ?? best?.mostReps ?? best?.longest;
+      weight?.set(top?.weight ?? (exercise.bodyweight ? 0 : null));
+      reps?.set(top?.reps ?? 10);
+      seconds?.set(top?.seconds ?? 30);
+      if (!best) { info.textContent = t('Cvik zatím nemáš odcvičený.'); return; }
+      const parts = best.heaviest
+        ? [t('nejtěžší {value}', { value: formatSet(best.heaviest, exercise, fields) }),
+          best.mostReps.weight !== best.heaviest.weight ? t('nejvíc opakování {value}', { value: formatSet(best.mostReps, exercise, fields) }) : null]
+        : [formatSet(top, exercise, fields)];
+      info.textContent = t('Nejvíc doteď: {value}', { value: parts.filter(Boolean).join(' · ') });
     };
-
-    const metricSeg = metrics.length > 1 ? el('div', { class: 'segmented' }, metrics.map((m) => el('button', {
-      type: 'button', class: `seg ${m === metric ? 'is-selected' : ''}`, text: m === 'weight' ? t('Váha') : m === 'reps' ? t('Opakování') : t('Výdrž'),
-      onclick: (e) => {
-        metric = m;
-        e.currentTarget.parentElement.querySelectorAll('.seg').forEach((b) => b.classList.toggle('is-selected', b === e.currentTarget));
-        gain.value = m === 'weight' ? numPlain((exercise.weightStep ?? 2.5) * 2) : m === 'seconds' ? '15' : '2';
-        refresh();
-      },
-    }))) : null;
 
     const gymSelect = exercise.perGym && gyms.length > 1
       ? el('select', { class: 'input', onchange: (e) => { gymId = e.target.value; refresh(); } },
@@ -190,12 +233,10 @@ async function createExerciseGoal() {
 
     const form = el('form', { method: 'dialog', class: 'dialog-body stack-tight' }, [
       el('h2', { class: 'dialog-title', text: exName(exercise) }),
-      metricSeg,
       gymSelect ? el('label', { class: 'field' }, [el('span', { class: 'field-label', text: t('Posilovna') }), gymSelect]) : null,
       info,
-      el('label', { class: 'field' }, [el('span', { class: 'field-label', text: t('Výchozí hodnota') }), baseline]),
-      el('label', { class: 'field' }, [gainLabel, gain]),
-      el('label', { class: 'field' }, [el('span', { class: 'field-label', text: t('Za kolik tréninků') }), sessions]),
+      weight?.root, reps?.root, seconds?.root,
+      duration.root,
       el('div', { class: 'dialog-actions' }, [
         el('button', { type: 'button', class: 'btn', text: t('Zrušit'), onclick: () => close(null) }),
         el('button', { type: 'submit', class: 'btn btn-primary', text: t('Vytvořit') }),
@@ -203,20 +244,26 @@ async function createExerciseGoal() {
     ]);
     form.addEventListener('submit', (e) => {
       e.preventDefault();
-      const base = baseline.dataset.auto !== '' ? Number(baseline.dataset.auto) : parse(baseline);
-      const g = parse(gain);
-      const n = parseInt(sessions.value, 10);
-      if (!Number.isFinite(base)) { toast(t('Zadej výchozí hodnotu')); return; }
-      if (!(g > 0)) { toast(t('Přírůstek musí být větší než 0')); return; }
-      if (!(n > 0)) { toast(t('Zadej počet tréninků')); return; }
+      const target = {};
+      if (weight) target.weight = weight.value();
+      if (reps) target.reps = Math.round(reps.value());
+      if (seconds) target.seconds = Math.round(seconds.value());
+      if (weight && !Number.isFinite(target.weight)) { toast(t('Zadej váhu')); return; }
+      if (reps && !(target.reps > 0)) { toast(t('Zadej počet opakování')); return; }
+      if (seconds && !(target.seconds > 0)) { toast(t('Zadej výdrž')); return; }
+      const past = sets();
+      if (past.some((s) => Object.keys(target).every((k) => (s[k] ?? 0) >= target[k]))) {
+        toast(t('Tohle už máš splněné, nastav vyšší cíl'));
+        return;
+      }
       close(newGoal({
-        kind: 'exercise', exerciseId: exercise.id, gymId, metric,
-        baseline: base, target: Math.round((base + g) * 100) / 100, sessions: n,
+        kind: 'exercise', exerciseId: exercise.id, gymId, targetSet: target,
+        start: goalStartFrom(past, target), dueDate: duration.dueDate(),
       }));
     });
-    queueMicrotask(refresh);
+    refresh();
     return form;
-  });
+  }, { focus: false });
   if (goal) { await saveGoal(goal); toast(t('Cíl vytvořen')); }
 }
 
@@ -224,33 +271,38 @@ async function createMeasureGoal() {
   const [kinds, measurements] = await Promise.all([listMeasureKinds(), listMeasurements()]);
   const goal = await openDialog((close) => {
     let key = kinds[0].key;
-    const latest = (k) => measurements.find((m) => m.kind === k)?.value ?? null;
+    const latest = (k) => measurements.find((m) => m.kind === k) ?? null;
+    const info = el('p', { class: 'muted small' });
+    const target = decimalInput(null);
+    const duration = durationField({ n: 2, unit: 'month' }, { optional: true });
+    const refresh = () => {
+      const last = latest(key);
+      const kind = kinds.find((k) => k.key === key);
+      info.textContent = last
+        ? t('Poslední záznam: {value} ({date})', { value: `${num(last.value)} ${kind.unit}`, date: dateShort.format(new Date(last.date)) })
+        : t('Zatím bez záznamu – hodnotu zapíšeš později tlačítkem Zapsat hodnotu u cíle.');
+    };
     const kindSelect = el('select', { class: 'input', onchange: (e) => { key = e.target.value; refresh(); } },
       kinds.map((k) => el('option', { value: k.key, text: `${kindName(k)} (${k.unit})` })));
-    const current = decimalInput(latest(key));
-    const target = decimalInput(null);
-    const due = el('input', { type: 'date', class: 'input' });
-    const refresh = () => { current.value = latest(key) == null ? '' : numPlain(latest(key)); };
 
     const form = el('form', { method: 'dialog', class: 'dialog-body stack-tight' }, [
       el('h2', { class: 'dialog-title', text: t('Cíl u tělesné míry') }),
       el('label', { class: 'field' }, [el('span', { class: 'field-label', text: t('Míra') }), kindSelect]),
-      el('label', { class: 'field' }, [el('span', { class: 'field-label', text: t('Současná hodnota') }), current, el('span', { class: 'field-hint', text: t('Zapíše se jako dnešní měření, pokud se liší od posledního.') })]),
+      info,
       el('label', { class: 'field' }, [el('span', { class: 'field-label', text: t('Cílová hodnota') }), target]),
-      el('label', { class: 'field' }, [el('span', { class: 'field-label', text: t('Do data (nepovinné)') }), due]),
+      duration.root,
       el('div', { class: 'dialog-actions' }, [
         el('button', { type: 'button', class: 'btn', text: t('Zrušit'), onclick: () => close(null) }),
         el('button', { type: 'submit', class: 'btn btn-primary', text: t('Vytvořit') }),
       ]),
     ]);
-    form.addEventListener('submit', async (e) => {
+    form.addEventListener('submit', (e) => {
       e.preventDefault();
-      const cur = parse(current);
       const goalValue = parse(target);
       if (!Number.isFinite(goalValue)) { toast(t('Zadej cílovou hodnotu')); return; }
-      if (Number.isFinite(cur) && cur !== latest(key)) await addMeasurement(key, cur);
-      close(newGoal({ kind: 'measure', measureKey: key, startValue: Number.isFinite(cur) ? cur : null, target: goalValue, dueDate: due.value || null }));
+      close(newGoal({ kind: 'measure', measureKey: key, startValue: latest(key)?.value ?? null, target: goalValue, dueDate: duration.dueDate() }));
     });
+    refresh();
     return form;
   });
   if (goal) { await saveGoal(goal); toast(t('Cíl vytvořen')); }

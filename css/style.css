@@ -599,6 +599,8 @@ select.input {
 .goal-card.is-done .progress-fill { background: var(--gold); }
 .goal-detail { margin: 0; }
 .goal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+.duration-value { display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 24px; line-height: 1.1; }
+.duration-value small { font-family: var(--font-body); font-weight: 500; font-size: 13px; color: var(--text-2); }
 .stack-tight > * + * { margin-top: 12px; }
 .stack-tight .dialog-title { margin-bottom: 0; }
 input[type="date"].input { min-height: var(--tap); line-height: var(--tap); }
