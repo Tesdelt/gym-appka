@@ -7,6 +7,7 @@ import { slotsOf } from '../recommend.js';
 import { findNewRecords } from '../records.js';
 import { listGoals, evaluateGoal, markReachedGoals } from '../goals.js';
 import { exerciseMap, listMeasurements } from '../data.js';
+import { listManualRecords, manualAsWorkouts } from '../stats.js';
 import {
   getActiveWorkout, getWorkout, listDoneWorkouts, finishWorkout, saveWorkout, deleteWorkout,
   elapsedSeconds, formatDurationLong, compareWithPrevious, slotLabel,
@@ -40,7 +41,9 @@ async function drawSummary(container, workout, id, state, redraw) {
   const done = await listDoneWorkouts();
   const previousAll = done.filter((w) => w.id !== workout.id && w.startedAt < workout.startedAt);
   const previousSame = previousAll.find((w) => w.templateId === workout.templateId) ?? null;
-  const records = findNewRecords(workout, previousAll);
+  const [manual, exMap] = await Promise.all([listManualRecords(), exerciseMap()]);
+  const manualBefore = manualAsWorkouts(manual.filter((m) => m.date < workout.startedAt), exMap);
+  const records = findNewRecords(workout, [...previousAll, ...manualBefore]);
   const recordSlots = new Set(records.map((r) => r.slot));
   const comparison = compareWithPrevious(workout, previousSame);
   const started = new Date(workout.startedAt);

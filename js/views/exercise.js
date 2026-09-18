@@ -14,8 +14,8 @@ import { navigate } from '../router.js';
 import { listDoneWorkouts, buildEntry } from '../workout.js';
 import { listGoals } from '../goals.js';
 import { computeRecords, recordKey } from '../records.js';
-import { slotsOf } from '../recommend.js';
-import { lineChart } from '../chart.js';
+import { rangeChart } from '../chart.js';
+import { listManualRecords, manualAsWorkouts, exercisePoints, exerciseFormat, exerciseChartTitle } from '../stats.js';
 import {
   imageBox, pickPhoto, deleteImage, fetchDbExercise, downloadDbImages, loadDbIndex, MUSCLE_CS, EQUIPMENT_FROM_DB,
 } from '../images.js';
@@ -55,8 +55,9 @@ function goBack() {
 
 // ---------- Detail ----------
 async function renderDetail(container, exercise) {
-  const [done, gyms, templates, lastGymId, goals] = await Promise.all([listDoneWorkouts(), listGyms(), listTemplates(), getLastGymId(), listGoals()]);
-  const records = computeRecords(done);
+  const [done, gyms, templates, lastGymId, goals, manual] = await Promise.all([listDoneWorkouts(), listGyms(), listTemplates(), getLastGymId(), listGoals(), listManualRecords()]);
+  const manualSessions = manualAsWorkouts(manual.filter((m) => m.exerciseId === exercise.id), new Map([[exercise.id, exercise]]));
+  const records = computeRecords([...done, ...manualSessions]);
   let gymId = lastGymId ?? gyms[0]?.id;
 
   const stack = el('div', { class: 'stack' });
@@ -124,7 +125,7 @@ async function renderDetail(container, exercise) {
       ?? { mode: 'sets', sets: [{ weight: 0, reps: 10, seconds: 30, rest: 180 }], repRange: null, weightStep: null };
     const entry = buildEntry(item, exercise, gymId, done, goals);
     const rec = records.get(recordKey({ exerciseId: exercise.id, perGym: exercise.perGym }, gymId));
-    const chartData = historyPoints(done, exercise, gymId);
+    const points = exercisePoints([...done, ...manualSessions], exercise, gymId);
 
     progress.replaceChildren(...[
       el('h3', { class: 'card-title', text: 'Výkon' }),
@@ -137,8 +138,9 @@ async function renderDetail(container, exercise) {
         kv(entry.goal?.applied ? 'Doporučení teď (podle cíle)' : 'Doporučení teď', entry.rec?.length ? formatValues(entry, entry.rec) : '–'),
         kv('Osobní rekord', recordText(exercise, rec), true),
       ]),
-      el('h4', { class: 'sub-title', text: chartTitle(exercise) }),
-      lineChart(chartData.points, { format: chartData.format }),
+      el('h4', { class: 'sub-title', text: exerciseChartTitle(exercise) }),
+      rangeChart(points, { format: exerciseFormat(exercise) }),
+      el('button', { type: 'button', class: 'btn btn-small', text: 'Statistiky a ruční záznamy', onclick: () => navigate(`statistiky/cvik/${encodeURIComponent(exercise.id)}`) }),
     ].filter(Boolean));
   };
   drawProgress();
@@ -183,48 +185,13 @@ function kv(label, value, gold = false) {
   return el('div', { class: 'kv-row' }, [el('dt', { text: label }), el('dd', { class: gold && value !== '–' ? 'gold' : '', text: value })]);
 }
 
-function chartTitle(exercise) {
-  if (exercise.type === 'time') return 'Nejdelší výdrž v tréninku';
-  if (exercise.type === 'reps') return 'Nejvíc opakování v sérii';
-  return exercise.bodyweight ? 'Nejvyšší přidaná váha v tréninku' : 'Nejvyšší váha v tréninku';
-}
-
-function recordText(exercise, rec) {
+export function recordText(exercise, rec) {
   if (!rec) return '–';
   if (exercise.type === 'time') return rec.maxSeconds ? `${rec.maxSeconds.value} s` : '–';
   if (exercise.type === 'reps') return rec.maxReps ? `${rec.maxReps.value} opak.` : '–';
   if (!rec.maxWeight) return '–';
   const reps = rec.repsAtWeight.get(rec.maxWeight.value)?.value ?? rec.maxWeight.reps;
   return `${formatWeight(rec.maxWeight.value, { bodyweight: exercise.bodyweight })} × ${reps}`;
-}
-
-// Body grafu: nejlepší hodnota z každého tréninku
-export function historyPoints(done, exercise, gymId) {
-  const points = [];
-  for (const w of done) {
-    if (exercise.perGym && w.gymId !== gymId) continue;
-    for (const entry of w.exercises) {
-      if (entry.exerciseId !== exercise.id) continue;
-      const slots = slotsOf(entry).filter((s) => s.done);
-      if (!slots.length) continue;
-      let v;
-      if (exercise.type === 'time') v = Math.max(...slots.map((s) => s.seconds ?? 0));
-      else if (exercise.type === 'reps') v = Math.max(...slots.map((s) => s.reps ?? 0));
-      else v = Math.max(...slots.filter((s) => s.reps > 0).map((s) => s.weight ?? 0));
-      if (Number.isFinite(v)) points.push({ t: w.startedAt, v });
-    }
-  }
-  // zlatě maximum
-  if (points.length) {
-    const max = Math.max(...points.map((p) => p.v));
-    const best = [...points].sort((a, b) => a.t.localeCompare(b.t)).find((p) => p.v === max);
-    best.gold = true;
-  }
-  let format;
-  if (exercise.type === 'time') format = (v) => `${v} s`;
-  else if (exercise.type === 'reps') format = (v) => String(v);
-  else format = (v) => formatWeight(v, { bodyweight: exercise.bodyweight }).replace(' kg', '');
-  return { points, format };
 }
 
 // ---------- Formulář ----------
