@@ -5,6 +5,7 @@ import { el, toast, confirmDialog, openDialog, promptText, stepField, formatValu
 import { navigate } from '../router.js';
 import { slotsOf } from '../recommend.js';
 import { findNewRecords } from '../records.js';
+import { celebrate } from '../fx.js';
 import { listGoals, evaluateGoal, markReachedGoals } from '../goals.js';
 import { exerciseMap, listMeasurements } from '../data.js';
 import { listManualRecords, manualAsWorkouts } from '../stats.js';
@@ -173,6 +174,12 @@ async function drawSummary(container, workout, id, state, redraw) {
     ])),
     comment,
   ]));
+
+  // Oslava: nový rekord nebo splněný cíl (jen při ukončení tréninku)
+  if (workout.status === 'active' && !state.celebrated && (records.length || stack.querySelector('.card-gold li.gold'))) {
+    state.celebrated = true;
+    setTimeout(celebrate, 250);
+  }
 
   // Akce
   if (workout.status === 'active') {

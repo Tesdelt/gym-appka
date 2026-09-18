@@ -7,9 +7,12 @@ import { slotsOf } from '../recommend.js';
 import { pickExercise } from '../exercisePicker.js';
 import { imageBox } from '../images.js';
 import { exerciseMap } from '../data.js';
+import { computeRecords, recordKey } from '../records.js';
+import { listManualRecords, manualAsWorkouts } from '../stats.js';
+import { celebrate, roll, slideOut, slideIn, onSwipe } from '../fx.js';
 import {
   getActiveWorkout, saveWorkout, deleteWorkout, currentSlot, completeCurrent, nextUndone, firstUndoneIn,
-  positionAfterConfirm, prevInOrder, slotLabel, restAfter, entryDone, elapsedSeconds, formatDuration, buildAdHocEntry,
+  positionAfterConfirm, prevInOrder, nextInOrder, listDoneWorkouts, slotLabel, restAfter, entryDone, elapsedSeconds, formatDuration, buildAdHocEntry,
 } from '../workout.js';
 
 export const title = '';
@@ -43,8 +46,22 @@ export async function render(container, { extraEl, titleEl }) {
   let saveTimer = null;
   const save = () => saveWorkout(workout).catch((err) => { console.error(err); toast('Uložení selhalo'); });
   const saveLater = () => { clearTimeout(saveTimer); saveTimer = setTimeout(save, 400); };
-  const exercises = await exerciseMap();
-  const ctx = { save, saveLater, exercises, draw: () => container.replaceChildren(...screen(workout, ctx)) };
+  const [exercises, done, manual] = await Promise.all([exerciseMap(), listDoneWorkouts(), listManualRecords()]);
+  const prior = [...done, ...manualAsWorkouts(manual, exercises)];
+  const ctx = {
+    save, saveLater, exercises, prior, priorRecords: computeRecords(prior),
+    draw: () => container.replaceChildren(...screen(workout, ctx)),
+    // karta odjede, změní se pozice a nová přijede z druhé strany
+    move: async (dir, mutate) => {
+      const card = container.querySelector('.card-current');
+      if (card) await slideOut(card, dir);
+      mutate();
+      ctx.save();
+      ctx.draw();
+      const next = container.querySelector('.card-current') ?? container.firstElementChild;
+      if (next) slideIn(next, dir);
+    },
+  };
 
   extraEl.append(
     el('button', { type: 'button', class: 'btn btn-small', text: 'Cviky', onclick: () => exerciseListSheet(workout, ctx) }),
@@ -112,7 +129,7 @@ function currentCard(workout, cur, ctx) {
   // Obrázek + minule / doporučení
   card.append(el('div', { class: 'ex-media' }, [
     el('button', { type: 'button', class: 'ex-image', 'aria-label': 'Podrobnosti cviku', onclick: () => navigate(`cvik/${encodeURIComponent(entry.exerciseId)}`) }, [
-      imageBox(ctx.exercises.get(entry.exerciseId), { cls: 'ex-image-pic' }),
+      Object.assign(imageBox(ctx.exercises.get(entry.exerciseId), { cls: 'ex-image-pic' }), { style: 'view-transition-name: ex-image' }),
       el('span', { class: 'ex-image-label', text: 'Podrobnosti' }),
     ]),
     el('div', { class: 'ex-meta' }, [
@@ -174,15 +191,15 @@ function currentCard(workout, cur, ctx) {
   card.append(el('div', { class: 'nav-row' }, [
     el('button', {
       type: 'button', class: 'btn btn-back', text: '←', 'aria-label': 'Předchozí série', disabled: prev ? null : '',
-      onclick: () => { workout.cursor = prev; ctx.save(); ctx.draw(); },
+      onclick: () => ctx.move(-1, () => { workout.cursor = prev; }),
     }),
     el('button', {
       type: 'button', class: `btn btn-primary btn-done ${toNextExercise ? 'is-next-exercise' : ''}`,
       onclick: () => {
-        completeCurrent(workout);
-        ctx.save();
+        const record = isNewRecord(workout, cur, ctx);
         card.classList.add('is-confirmed');
-        setTimeout(() => ctx.draw(), 160);
+        if (record) { celebrate(); toast('Nový osobní rekord!'); }
+        ctx.move(1, () => completeCurrent(workout));
       },
     }, [el('span', { class: 'btn-done-label', text: label }), el('span', { class: 'btn-done-arrow', text: arrow })]),
   ]));
@@ -208,7 +225,28 @@ function currentCard(workout, cur, ctx) {
     el('div', { class: 'note-next' }, [el('span', { class: 'muted small', text: 'Na příště' }), seg]),
   ]));
 
+  // přejetí prstem: doleva další série, doprava předchozí (bez potvrzení)
+  onSwipe(card, {
+    left: () => { const n = nextInOrder(workout, workout.cursor); if (n) ctx.move(1, () => { workout.cursor = n; }); },
+    right: () => { if (prev) ctx.move(-1, () => { workout.cursor = prev; }); },
+  });
+
   return card;
+}
+
+// Je právě potvrzovaná série nový osobní rekord? (jen když cvik už má historii)
+function isNewRecord(workout, cur, ctx) {
+  const { entry, slot } = cur;
+  if (slot.done) return false;
+  const key = recordKey(entry, workout.gymId);
+  if (!ctx.priorRecords.get(key)) return false;
+  const rec = computeRecords([...ctx.prior, { ...workout, status: 'done' }]).get(key);
+  if (entry.type === 'time') return slot.seconds > (rec.maxSeconds?.value ?? 0);
+  if (entry.type === 'reps') return slot.reps > (rec.maxReps?.value ?? 0);
+  if (!(slot.reps > 0)) return false;
+  if (!rec.maxWeight || slot.weight > rec.maxWeight.value) return true;
+  const at = rec.repsAtWeight.get(slot.weight);
+  return Boolean(at) && slot.reps > at.value;
 }
 
 function metaRow(label, value) {
@@ -240,8 +278,10 @@ function stepper({ label, unit, value, display, step, min, set, editTitle, intSt
   const change = (delta) => {
     let v = Math.round((value() + delta) * 100) / 100;
     if (min != null && v < min) v = min;
+    if (v === value()) return;
     set(v);
     refresh();
+    roll(num, Math.sign(delta));
   };
   num.addEventListener('click', async () => {
     const v = await promptNumber({ title: editTitle, value: value(), step: intStep ? 1 : 'any', min, unit });

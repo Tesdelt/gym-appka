@@ -18,6 +18,7 @@ import {
   exerciseChartTitle, frequency,
 } from '../stats.js';
 import { recordText } from './exercise.js';
+import { countUp } from '../fx.js';
 
 export const title = 'Statistiky';
 
@@ -134,7 +135,11 @@ async function renderOverview(container) {
 }
 
 function tile(label, value) {
-  return el('div', { class: 'stat-tile' }, [el('span', { class: 'stat-tile-value', text: value }), el('span', { class: 'muted small', text: label })]);
+  const n = parseFloat(value.replace(',', '.'));
+  const valueEl = el('span', { class: 'stat-tile-value', text: value });
+  const decimals = value.includes(',') ? 1 : 0;
+  countUp(valueEl, n, (v) => num(decimals ? v : Math.round(v), decimals));
+  return el('div', { class: 'stat-tile' }, [valueEl, el('span', { class: 'muted small', text: label })]);
 }
 
 // ---------- Tělesná míra ----------

@@ -65,6 +65,7 @@ async function renderDetail(container, exercise) {
 
   // Obrázek a název
   const pic = imageBox(exercise, { cls: 'ex-hero', toggle: true });
+  pic.style.viewTransitionName = 'ex-image';
   stack.append(el('section', { class: 'card ex-detail-head' }, [
     pic,
     el('div', { class: 'ex-detail-title' }, [

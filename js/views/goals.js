@@ -2,6 +2,7 @@
 
 import { el, openDialog, confirmDialog, promptNumber, toast, plural, formatWeight, dateShort } from '../ui.js';
 import { navigate } from '../router.js';
+import { countUp } from '../fx.js';
 import { exerciseMap, listGyms, getLastGymId, listMeasureKinds, listMeasurements, addMeasurement } from '../data.js';
 import { listDoneWorkouts } from '../workout.js';
 import { pickExercise } from '../exercisePicker.js';
@@ -90,13 +91,17 @@ function goalCard(goal, ctx) {
   }));
 
   const pct = Math.round((done ? 1 : state.progress) * 100);
+  const fill = el('div', { class: 'progress-fill', style: 'width: 0%' });
+  const pctEl = el('span', { class: 'goal-pct', text: done ? '✓ splněno' : `${pct} %` });
+  requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.width = `${pct}%`; }));
+  if (!done) countUp(pctEl, pct, (v) => `${Math.round(v)} %`);
   return el('section', { class: `card goal-card ${done ? 'is-done' : ''}` }, [
     el('div', { class: 'goal-head' }, [
       el('h3', { class: 'goal-title', text: heading }),
-      el('span', { class: 'goal-pct', text: done ? '✓ splněno' : `${pct} %` }),
+      pctEl,
     ]),
     el('div', { class: 'progress', role: 'progressbar', 'aria-valuenow': pct, 'aria-valuemin': 0, 'aria-valuemax': 100 }, [
-      el('div', { class: 'progress-fill', style: `width: ${pct}%` }),
+      fill,
     ]),
     el('p', { class: 'muted small goal-detail', text: detail }),
     done && goal.doneAt ? el('p', { class: 'small gold', text: `Splněno ${dateShort.format(new Date(goal.doneAt))}` }) : null,

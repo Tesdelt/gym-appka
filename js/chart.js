@@ -61,7 +61,7 @@ export function lineChart(points, { format = (v) => String(v), height = 170 } = 
 
   if (data.length > 1) {
     const d = data.map((p, i) => `${i ? 'L' : 'M'}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
-    svg.append(node('path', { d, class: 'chart-line' }));
+    svg.append(node('path', { d, class: 'chart-line', pathLength: 1 }));
   }
   for (const p of data) {
     svg.append(node('circle', { cx: x(p.t), cy: y(p.v), r: p.gold ? 4.5 : 3, class: `chart-dot${p.gold ? ' is-gold' : ''}${p.manual ? ' is-manual' : ''}` }));

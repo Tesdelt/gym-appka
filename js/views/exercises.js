@@ -20,7 +20,13 @@ export async function render(container, { extraEl }) {
     lastQuery = query;
     const found = exercises.filter((e) => matchesExercise(e, query));
     list.replaceChildren(...found.map((ex) => el('li', { class: 'card ex-card' }, [
-      el('button', { type: 'button', class: 'ex-card-btn', onclick: () => navigate(`cvik/${encodeURIComponent(ex.id)}`) }, [
+      el('button', {
+        type: 'button', class: 'ex-card-btn',
+        onclick: (e) => {
+          e.currentTarget.querySelector('.ex-thumb').style.viewTransitionName = 'ex-image';
+          navigate(`cvik/${encodeURIComponent(ex.id)}`);
+        },
+      }, [
         imageBox(ex, { cls: 'ex-thumb' }),
         el('span', { class: 'ex-card-text' }, [
           el('span', { class: 'ex-card-name', text: ex.name }),

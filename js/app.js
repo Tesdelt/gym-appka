@@ -2,6 +2,7 @@ import { addRoute, startRouter } from './router.js';
 import { openDB, requestPersistentStorage } from './db.js';
 import { seedIfEmpty } from './seed.js';
 import { applyTheme } from './theme.js';
+import { transition } from './fx.js';
 import * as home from './views/home.js';
 import * as stats from './views/stats.js';
 import * as goals from './views/goals.js';
@@ -43,25 +44,41 @@ async function init() {
   // Nečekáme na výsledek, jen požádáme (iOS rozhodne samo).
   requestPersistentStorage();
 
+  const TAB_ORDER = ['domu', 'statistiky', 'cile', 'cviky', 'nastaveni'];
+  let prev = null;
+
   startRouter(async (name, view, params) => {
-    titleEl.textContent = view.title;
-    extraEl.replaceChildren();
-    viewEl.className = 'view';
-    viewEl.replaceChildren();
-    viewEl.scrollTop = 0;
-    tabs.forEach((tab) => {
-      const active = tab.dataset.route === (view.tab ?? name);
-      tab.classList.toggle('is-active', active);
-      if (active) tab.setAttribute('aria-current', 'page');
-      else tab.removeAttribute('aria-current');
-    });
-    try {
-      await view.render(viewEl, { params, extraEl, titleEl });
-    } catch (err) {
-      console.error(err);
-      viewEl.innerHTML = `<section class="card"><h2 class="card-title">Něco se pokazilo</h2>
-        <p class="muted">${escapeHtml(err?.message ?? String(err))}</p></section>`;
-    }
+    const tab = view.tab ?? name;
+    const depth = params.length + (TAB_ORDER.includes(name) ? 0 : 1);
+    let direction = 'fade';
+    if (prev && prev.tab !== tab) direction = TAB_ORDER.indexOf(tab) > TAB_ORDER.indexOf(prev.tab) ? 'next' : 'prev';
+    else if (prev && depth !== prev.depth) direction = depth > prev.depth ? 'forward' : 'back';
+    const first = !prev;
+    prev = { tab, depth };
+
+    const update = async () => {
+      titleEl.className = 'screen-title';
+      titleEl.textContent = view.title;
+      extraEl.replaceChildren();
+      viewEl.className = 'view';
+      viewEl.replaceChildren();
+      viewEl.scrollTop = 0;
+      tabs.forEach((t) => {
+        const active = t.dataset.route === tab;
+        t.classList.toggle('is-active', active);
+        if (active) t.setAttribute('aria-current', 'page');
+        else t.removeAttribute('aria-current');
+      });
+      try {
+        await view.render(viewEl, { params, extraEl, titleEl });
+      } catch (err) {
+        console.error(err);
+        viewEl.innerHTML = `<section class="card"><h2 class="card-title">Něco se pokazilo</h2>
+          <p class="muted">${escapeHtml(err?.message ?? String(err))}</p></section>`;
+      }
+    };
+    if (first) await update();
+    else await transition(direction, update);
   });
 
   registerServiceWorker();

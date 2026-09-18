@@ -19,10 +19,15 @@ export function el(tag, attrs = {}, children = []) {
 export function openDialog(build) {
   return new Promise((resolve) => {
     const dialog = el('dialog', { class: 'dialog' });
+    let closing = false;
     const close = (value) => {
-      dialog.close();
-      dialog.remove();
+      if (closing) return;
+      closing = true;
       resolve(value);
+      const done = () => { dialog.close(); dialog.remove(); };
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { done(); return; }
+      dialog.classList.add('is-closing');
+      setTimeout(done, 140);
     };
     dialog.append(build(close));
     dialog.addEventListener('cancel', (e) => { e.preventDefault(); close(null); });
