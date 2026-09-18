@@ -159,21 +159,29 @@ async function drawSummary(container, workout, id, state, redraw) {
     }),
   ]));
 
-  // Škály a komentář
+  // Škály a komentář. Při ukončení jsou předvyplněné nejlepší hodnoty
+  // (energie a spánek 5, jídlo 3 = akorát), stačí upravit, co bylo horší.
+  const BEST = { energy: 5, sleep: 5, food: 3 };
   const scales = { ...workout.scales };
+  if (workout.status === 'active') for (const k of Object.keys(BEST)) scales[k] ??= BEST[k];
   const comment = el('textarea', { class: 'input textarea', rows: 3, placeholder: t('Komentář (např. „unavený už předem“)'), disabled: editable ? null : '' });
   comment.value = workout.comment ?? '';
+  // u jídla je optimum uprostřed, proto popisky
+  const hints = { food: [t('nic'), t('akorát'), t('přejedený')] };
   stack.append(el('section', { class: 'card' }, [
     el('h2', { class: 'card-title', text: t('Jak to šlo') }),
-    ...SCALES.map(([key, label]) => el('div', { class: 'scale-row' }, [
-      el('span', { class: 'scale-label', text: label }),
-      el('div', { class: 'segmented' }, [1, 2, 3, 4, 5].map((n) => el('button', {
-        type: 'button', class: `seg ${scales[key] === n ? 'is-selected' : ''}`, text: String(n), disabled: editable ? null : '',
-        onclick: (e) => {
-          scales[key] = scales[key] === n ? null : n;
-          e.currentTarget.parentElement.querySelectorAll('.seg').forEach((b, i) => b.classList.toggle('is-selected', scales[key] === i + 1));
-        },
-      }))),
+    ...SCALES.map(([key, label]) => el('div', { class: 'scale-block' }, [
+      el('div', { class: 'scale-row' }, [
+        el('span', { class: 'scale-label', text: label }),
+        el('div', { class: `segmented ${key === 'food' ? 'scale-food' : ''}` }, [1, 2, 3, 4, 5].map((n) => el('button', {
+          type: 'button', class: `seg ${scales[key] === n ? 'is-selected' : ''} ${n === BEST[key] ? 'is-best' : ''}`, text: String(n), disabled: editable ? null : '',
+          onclick: (e) => {
+            scales[key] = n;
+            e.currentTarget.parentElement.querySelectorAll('.seg').forEach((b, i) => b.classList.toggle('is-selected', scales[key] === i + 1));
+          },
+        }))),
+      ]),
+      hints[key] ? el('div', { class: 'scale-hints' }, hints[key].map((h) => el('span', { text: h }))) : null,
     ])),
     comment,
   ]));

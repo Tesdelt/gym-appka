@@ -193,10 +193,29 @@ export async function reorderTemplates(ids) {
 }
 
 // Výchozí položka šablony pro cvik
+// Výchozí pauza podle charakteru cviku (v sekundách):
+//  5 min – vlastní váha se zátěží a těžké vícekloubové cviky s velkou činkou,
+//  4 min – ostatní vícekloubové cviky (zapojují víc svalů),
+//  3 min – izolované cviky a „pumpičky“.
+// mechanic: 'c' vícekloubový / 'i' izolovaný (u vlastních cviků se odhadne z partií).
+export function exerciseMechanic(exercise) {
+  if (exercise.mechanic) return exercise.mechanic;
+  const p = exercise.muscles?.primary ?? [];
+  const s = exercise.muscles?.secondary ?? [];
+  return p.length >= 2 || p.length + s.length >= 4 ? 'c' : 'i';
+}
+
+export function defaultRest(exercise) {
+  if (exercise.type === 'weight' && exercise.bodyweight) return 300;
+  if (exerciseMechanic(exercise) === 'i') return 180;
+  return exercise.equipment === 'barbell' ? 300 : 240;
+}
+
 export function defaultTemplateItem(exercise) {
+  const rest = defaultRest(exercise);
   const set = exercise.type === 'time'
-    ? { weight: 0, seconds: 60, rest: 180 }
-    : { weight: exercise.type === 'reps' ? 0 : 10, reps: 10, rest: 180 };
+    ? { weight: 0, seconds: 60, rest }
+    : { weight: exercise.type === 'reps' ? 0 : 10, reps: 10, rest };
   return { exerciseId: exercise.id, mode: 'sets', sets: [{ ...set }, { ...set }, { ...set }], repRange: null, weightStep: null };
 }
 

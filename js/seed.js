@@ -15,6 +15,7 @@ export const DEFAULT_WEIGHT_STEP = 2.5;
 export const BUILTIN_EXERCISES = [
   {
     id: 'shyb',
+    mechanic: 'c',
     name: 'Shyb',
     aliases: ['shyby', 'pull-up', 'shyby se zátěží'],
     type: 'weight',
@@ -28,6 +29,7 @@ export const BUILTIN_EXERCISES = [
   },
   {
     id: 'kladka-biceps-curls',
+    mechanic: 'i',
     name: 'Kladka biceps curls',
     aliases: ['bicepsový zdvih na kladce', 'bicáky kladka'],
     type: 'weight',
@@ -41,6 +43,7 @@ export const BUILTIN_EXERCISES = [
   },
   {
     id: 'kladka-pull-row',
+    mechanic: 'c',
     name: 'Kladka pull row',
     aliases: ['veslování na kladce', 'přítahy vsedě'],
     type: 'weight',
@@ -54,6 +57,7 @@ export const BUILTIN_EXERCISES = [
   },
   {
     id: 'dumbbell-brachialis-curls',
+    mechanic: 'i',
     name: 'Dumbell brachialis curls (slant hammer)',
     aliases: ['kladiva', 'kladivový zdvih', 'slant hammer'],
     type: 'weight',
@@ -67,6 +71,7 @@ export const BUILTIN_EXERCISES = [
   },
   {
     id: 'dip',
+    mechanic: 'c',
     name: 'Dip',
     aliases: ['bradla', 'dipy', 'kliky na bradlech'],
     type: 'weight',
@@ -80,6 +85,7 @@ export const BUILTIN_EXERCISES = [
   },
   {
     id: 'shoulder-press-dumbbell',
+    mechanic: 'c',
     name: 'Shoulder press dumbell',
     aliases: ['tlaky na ramena', 'military s jednoručkami'],
     type: 'weight',
@@ -93,6 +99,7 @@ export const BUILTIN_EXERCISES = [
   },
   {
     id: 'shoulder-lateral-raise',
+    mechanic: 'i',
     name: 'Shoulder lateral raise',
     aliases: ['upažování', 'lateral raise', 'drop set ramena'],
     type: 'weight',
@@ -106,6 +113,7 @@ export const BUILTIN_EXERCISES = [
   },
   {
     id: 'overhead-around-wheel-lift',
+    mechanic: 'c',
     name: 'Overhead + around wheel lift',
     aliases: ['kotouč nad hlavu', 'around the world'],
     type: 'weight',
@@ -119,6 +127,7 @@ export const BUILTIN_EXERCISES = [
   },
   {
     id: 'kladka-triceps-extension',
+    mechanic: 'i',
     name: 'Kladka triceps extension/pulldown',
     aliases: ['stahování tricepsu', 'triceps kladka'],
     type: 'weight',
@@ -316,4 +325,41 @@ export async function upgradeExerciseData() {
     await put('exercises', ex);
   }
   await setMeta('exDataV2', new Date().toISOString());
+}
+
+// Jednorázově: pauzy ve všech typech tréninku a v rozdělaném tréninku podle
+// pravidla defaultRest (5 / 4 / 3 min). Doplní i charakter cviku.
+export async function applyRestRule() {
+  if (await getMeta('restRuleV1')) return;
+  const [{ getAll, put }, { defaultRest }, { loadDbIndex }] = await Promise.all([import('./db.js'), import('./data.js'), import('./images.js')]);
+  const catalog = await loadDbIndex().catch(() => []);
+  const builtin = new Map(BUILTIN_EXERCISES.map((e) => [e.id, e]));
+  const exercises = new Map();
+  for (const ex of await getAll('exercises')) {
+    if (!ex.mechanic) {
+      const m = builtin.get(ex.id)?.mechanic ?? catalog.find((c) => c.id === ex.dbId)?.m;
+      if (m) { ex.mechanic = m; await put('exercises', ex); }
+    }
+    exercises.set(ex.id, ex);
+  }
+  const restOf = (id) => (exercises.has(id) ? defaultRest(exercises.get(id)) : null);
+  for (const tpl of await getAll('templates')) {
+    for (const item of tpl.exercises) {
+      const rest = restOf(item.exerciseId);
+      if (rest == null) continue;
+      if (item.mode === 'dropset') item.rest = rest;
+      else item.sets.forEach((set) => { set.rest = rest; });
+    }
+    await put('templates', tpl);
+  }
+  for (const w of await getAll('workouts', 'status', 'active')) {
+    for (const entry of w.exercises) {
+      const rest = restOf(entry.exerciseId);
+      if (rest == null) continue;
+      if (entry.mode === 'dropset') entry.rest = rest;
+      else entry.sets.forEach((slot) => { if (!slot.done) slot.rest = rest; });
+    }
+    await put('workouts', w);
+  }
+  await setMeta('restRuleV1', new Date().toISOString());
 }

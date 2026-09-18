@@ -45,6 +45,7 @@ export async function exerciseFromDb(meta) {
     nameEn: meta.n,
     aliases: [],
     type: meta.t ?? 'weight',
+    mechanic: meta.m ?? 'c',
     bodyweight: meta.t === 'weight' && Boolean(meta.bw),
     equipment,
     perGym: equipment === 'cable',

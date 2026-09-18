@@ -12,7 +12,7 @@
 //   { plan: {weight, reps, seconds}, range: {min, max}, rest, weight, reps, seconds, done, doneAt }
 
 import { getAll, get, put, remove, newId } from './db.js';
-import { getExercise, getTemplate, weightStepFor, setLastGymId } from './data.js';
+import { getExercise, getTemplate, weightStepFor, setLastGymId, defaultRest } from './data.js';
 import { rangeFor, recommendSets, recommendDropset, slotsOf, round5 } from './recommend.js';
 import { listGoals, activeGoalFor, evaluateGoal, goalDelta } from './goals.js';
 import { t } from './i18n.js';
@@ -204,7 +204,8 @@ export async function buildAdHocEntry(exercise, gymId, templates) {
     if (item) break;
   }
   if (!item) {
-    const base = exercise.type === 'time' ? { weight: 0, seconds: 60, rest: 180 } : { weight: 0, reps: 10, rest: 180 };
+    const rest = defaultRest(exercise);
+    const base = exercise.type === 'time' ? { weight: 0, seconds: 60, rest } : { weight: 0, reps: 10, rest };
     item = { mode: 'sets', sets: [base, base, base], repRange: null, weightStep: null };
   }
   return buildEntry(item, exercise, gymId, done, goals);

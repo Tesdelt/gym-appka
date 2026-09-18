@@ -1,6 +1,6 @@
 // Obrazovka průběhu tréninku: vše na jedné obrazovce bez scrollování.
 
-import { el, openDialog, confirmDialog, promptNumber, toast, makeSortable, dragHandle, formatWeight, formatValues, formatRest, dateShort } from '../ui.js';
+import { el, openDialog, confirmDialog, promptNumber, toast, makeSortable, dragHandle, formatWeight, formatValues, dateShort } from '../ui.js';
 import { navigate } from '../router.js';
 import { listTemplates } from '../data.js';
 import { slotsOf } from '../recommend.js';
@@ -129,7 +129,6 @@ function lastPosition(workout) {
 function currentCard(workout, cur, ctx) {
   const { entry, slot, index } = cur;
   const rec = recommendationFor(entry, index);
-  const rest = restAfter(entry, index);
   const card = el('section', { class: 'card card-current' });
 
   // Hlavička
@@ -196,10 +195,7 @@ function currentCard(workout, cur, ctx) {
         ctx.draw();
       },
     }),
-    el('div', { class: 'rest-info' }, [
-      el('span', { class: 'muted small', text: t('Pauza') }),
-      el('span', { class: 'rest-value', text: rest ? formatRest(rest) : t('bez pauzy') }),
-    ]),
+    restStepper(entry, index, ctx),
   ]));
 
   // Navigace: malá šipka zpět, velké potvrzení vpřed
@@ -443,6 +439,36 @@ function countdown(getSeconds) {
     },
     stop: () => idle(),
   };
+}
+
+// Pauza po sérii s +/− po minutách (0–10). Změna platí pro tuto a zbývající
+// neodcvičené série cviku v tomto tréninku. U drop setu je to pauza po kole.
+function restStepper(entry, index, ctx) {
+  const inRound = entry.mode === 'dropset' && restAfter(entry, index) === 0;
+  const current = () => (entry.mode === 'dropset' ? entry.rest : entry.sets[index].rest) ?? 0;
+  const value = el('span', { class: 'rest-value' });
+  const show = () => {
+    const min = Math.round(current() / 60);
+    value.textContent = `${min} min`;
+  };
+  const change = (d) => {
+    const min = Math.max(0, Math.min(10, Math.round(current() / 60) + d));
+    if (min * 60 === current()) return;
+    if (entry.mode === 'dropset') entry.rest = min * 60;
+    else entry.sets.forEach((slot, i) => { if (i === index || (!slot.done && i > index)) slot.rest = min * 60; });
+    ctx.save();
+    show();
+    slideValue(value, value, Math.sign(d));
+  };
+  show();
+  return el('div', { class: 'rest-info rest-stepper' }, [
+    el('span', { class: 'muted small rest-label', text: inRound ? t('Pauza po kole') : t('Pauza') }),
+    el('div', { class: 'rest-row' }, [
+      el('button', { type: 'button', class: 'btn rest-btn', text: '−', 'aria-label': t('Kratší pauza'), onclick: () => change(-1) }),
+      value,
+      el('button', { type: 'button', class: 'btn rest-btn', text: '+', 'aria-label': t('Delší pauza'), onclick: () => change(1) }),
+    ]),
+  ]);
 }
 
 // ---------- Náhled dalšího cviku ----------

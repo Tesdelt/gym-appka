@@ -443,4 +443,10 @@ export const EN = {
   'Uloženo i do Mých cviků': 'Also saved to My exercises',
   'Cvik se nepodařilo přidat': 'Could not add the exercise',
   'Zpět': 'Back',
+  'Pauza po kole': 'Rest after round',
+  'Kratší pauza': 'Shorter rest',
+  'Delší pauza': 'Longer rest',
+  'nic': 'nothing',
+  'akorát': 'just right',
+  'přejedený': 'overate',
 };
