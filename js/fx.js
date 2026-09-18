@@ -100,3 +100,23 @@ export async function transition(direction, update) {
   const t = document.startViewTransition(update);
   try { await t.updateCallbackDone; } catch { /* chyba vykreslení se hlásí jinde */ }
 }
+
+// Výbuch s tlakovou vlnou z bodu (x, y) do celé obrazovky, ~0,7 s
+export function explode(x, y) {
+  const layer = document.createElement('div');
+  layer.className = 'fx-boom';
+  const reach = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y)) * 2;
+  layer.style.setProperty('--x', `${x}px`);
+  layer.style.setProperty('--y', `${y}px`);
+  layer.style.setProperty('--r', `${reach}px`);
+  layer.innerHTML = '<div class="fx-boom-flash"></div><div class="fx-boom-core"></div><div class="fx-boom-ring"></div><div class="fx-boom-ring fx-boom-ring-2"></div>';
+  document.body.append(layer);
+  setTimeout(() => layer.remove(), 900);
+  if (!reducedMotion()) {
+    const app = document.getElementById('app');
+    app.classList.remove('fx-blast');
+    void app.offsetWidth;
+    app.classList.add('fx-blast');
+    app.addEventListener('animationend', () => app.classList.remove('fx-blast'), { once: true });
+  }
+}

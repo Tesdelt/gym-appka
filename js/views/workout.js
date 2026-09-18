@@ -9,7 +9,7 @@ import { imageBox } from '../images.js';
 import { exerciseMap } from '../data.js';
 import { computeRecords, recordKey } from '../records.js';
 import { listManualRecords, manualAsWorkouts } from '../stats.js';
-import { celebrate, roll, slideOut, slideIn, onSwipe } from '../fx.js';
+import { celebrate, explode, reducedMotion, slideOut, slideIn, onSwipe } from '../fx.js';
 import {
   getActiveWorkout, saveWorkout, deleteWorkout, currentSlot, completeCurrent, nextUndone, firstUndoneIn,
   positionAfterConfirm, prevInOrder, adjacentExercise, listDoneWorkouts, slotLabel, restAfter, entryDone, elapsedSeconds, formatDuration, buildAdHocEntry,
@@ -159,22 +159,23 @@ function currentCard(workout, cur, ctx) {
 
   // Velká čísla
   const steppers = [];
-  if (entry.type !== 'reps') {
+  if (entry.type === 'weight') {
     steppers.push(stepper({
       label: entry.bodyweight ? 'Přidaná váha' : 'Váha', unit: 'kg',
-      value: () => slot.weight, display: () => weightDisplay(slot.weight, entry.bodyweight),
+      value: () => slot.weight, display: (v) => weightDisplay(v, entry.bodyweight),
       step: entry.weightStep, min: entry.bodyweight ? null : 0,
       set: (v) => { slot.weight = v; ctx.save(); }, editTitle: 'Váha (kg)',
     }));
   }
   if (entry.type === 'time') {
     steppers.push(stepper({
-      label: 'Výdrž', unit: 's', value: () => slot.seconds, display: () => String(slot.seconds), step: 5, min: 0,
+      label: 'Výdrž', unit: 's', value: () => slot.seconds, display: (v) => String(v), step: 5, min: 5,
       set: (v) => { slot.seconds = Math.round(v); ctx.save(); }, editTitle: 'Výdrž (s)', intStep: true,
     }));
+    steppers.push(countdown(() => slot.seconds, (held) => { slot.seconds = held; ctx.save(); ctx.draw(); }));
   } else {
     steppers.push(stepper({
-      label: 'Opakování', unit: '', value: () => slot.reps, display: () => String(slot.reps), step: 1, min: 0,
+      label: 'Opakování', unit: '', value: () => slot.reps, display: (v) => String(v), step: 1, min: 0,
       set: (v) => { slot.reps = Math.round(v); ctx.save(); }, editTitle: 'Opakování', intStep: true,
     }));
   }
@@ -289,18 +290,31 @@ function weightDisplay(kg, bodyweight) {
   return '0';
 }
 
+// Stepper: uprostřed hodnota, po stranách napůl schovaná sousední čísla
+// (o krok níž / výš). Při změně se celý pás rychle posune jako při swipu.
 function stepper({ label, unit, value, display, step, min, set, editTitle, intStep = false }) {
   const api = {};
-  const num = el('button', { type: 'button', class: 'stepper-value', 'aria-label': `${label}: upravit` });
-  const refresh = () => { num.textContent = display(); };
+  const round = (v) => Math.round(v * 100) / 100;
+  const prevEl = el('span', { class: 'sv sv-prev', 'aria-hidden': 'true' });
+  const curEl = el('span', { class: 'sv sv-cur' });
+  const nextEl = el('span', { class: 'sv sv-next', 'aria-hidden': 'true' });
+  const track = el('span', { class: 'sv-track' }, [prevEl, curEl, nextEl]);
+  const num = el('button', { type: 'button', class: 'stepper-value', 'aria-label': `${label}: upravit` }, [track]);
+  const refresh = () => {
+    const v = value();
+    curEl.textContent = display(v);
+    const lo = round(v - step);
+    prevEl.textContent = min != null && lo < min ? '' : display(lo);
+    nextEl.textContent = display(round(v + step));
+  };
   refresh();
   const change = (delta) => {
-    let v = Math.round((value() + delta) * 100) / 100;
+    let v = round(value() + delta);
     if (min != null && v < min) v = min;
     if (v === value()) return;
     set(v);
     refresh();
-    roll(num, Math.sign(delta));
+    slideValue(track, Math.sign(delta));
   };
   num.addEventListener('click', async () => {
     const v = await promptNumber({ title: editTitle, value: value(), step: intStep ? 1 : 'any', min, unit });
@@ -314,6 +328,79 @@ function stepper({ label, unit, value, display, step, min, set, editTitle, intSt
       num,
       el('button', { type: 'button', class: 'btn stepper-btn', text: '+', 'aria-label': `${label} plus`, onclick: () => change(step) }),
     ]),
+  ]);
+  return api;
+}
+
+// Posun pásu čísel: při zvýšení přijede nová hodnota zprava, při snížení zleva
+function slideValue(track, dir) {
+  if (reducedMotion() || !track.animate) return;
+  track.animate([
+    { transform: `translateX(${dir * 50}%)` },
+    { transform: 'none' },
+  ], { duration: 170, easing: 'cubic-bezier(0.2, 0.9, 0.25, 1)' });
+}
+
+// Odpočet výdrže: Start → běží do nuly → výbuch. Klepnutím během běhu se
+// zastaví a skutečně odvisená doba se zapíše do série.
+function countdown(getSeconds, onStopEarly) {
+  const api = {};
+  const big = el('span', { class: 'cd-big', text: 'Start' });
+  const small = el('span', { class: 'cd-small', text: `${getSeconds()} s` });
+  const btn = el('button', { type: 'button', class: 'btn countdown-btn', 'aria-label': 'Odpočet výdrže' }, [big, small]);
+  let endAt = null;
+  let startedAt = null;
+  let raf = null;
+  let wakeLock = null;
+
+  const fmt = (sec) => (sec >= 60 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}` : String(sec));
+  const reset = () => {
+    endAt = null;
+    cancelAnimationFrame(raf);
+    btn.classList.remove('is-running', 'is-final');
+    btn.style.removeProperty('--p');
+    big.textContent = 'Start';
+    small.textContent = `${getSeconds()} s`;
+    wakeLock?.release?.().catch(() => {});
+    wakeLock = null;
+  };
+  const tick = () => {
+    if (!btn.isConnected) { reset(); return; }
+    const total = getSeconds();
+    const left = Math.max(0, (endAt - Date.now()) / 1000);
+    const shown = Math.ceil(left);
+    big.textContent = fmt(shown);
+    btn.style.setProperty('--p', String(1 - left / total));
+    btn.classList.toggle('is-final', shown <= 3 && shown > 0);
+    if (left <= 0) {
+      const r = btn.getBoundingClientRect();
+      explode(r.left + r.width / 2, r.top + r.height / 2);
+      reset();
+      big.textContent = 'Hotovo!';
+      small.textContent = `${total} s`;
+      setTimeout(() => { if (!endAt && btn.isConnected) { big.textContent = 'Start'; } }, 1800);
+      return;
+    }
+    raf = requestAnimationFrame(tick);
+  };
+  btn.addEventListener('click', async () => {
+    if (endAt) {
+      const held = Math.round((Date.now() - startedAt) / 1000);
+      reset();
+      if (held > 0) { toast(`Zastaveno po ${held} s`); onStopEarly(held); }
+      return;
+    }
+    startedAt = Date.now();
+    endAt = startedAt + getSeconds() * 1000;
+    btn.classList.add('is-running');
+    small.textContent = 'klepni = stop';
+    try { wakeLock = await navigator.wakeLock?.request('screen'); } catch { /* nepodporováno */ }
+    tick();
+  });
+
+  api.root = el('div', { class: 'stepper' }, [
+    el('div', { class: 'stepper-label' }, [el('span', { text: 'Odpočet' })]),
+    btn,
   ]);
   return api;
 }
