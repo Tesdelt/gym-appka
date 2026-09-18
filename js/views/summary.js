@@ -198,24 +198,46 @@ async function drawSummary(container, workout, id, state, redraw) {
   }
 }
 
-// Dialog pro úpravu jedné série: váha / opakování (nebo výdrž) a zda byla odcvičená.
+function kv(label, value) {
+  return el('div', { class: 'kv-row' }, [el('dt', { text: label }), el('dd', { text: value })]);
+}
+
+// Dialog pro úpravu jedné série: váha / opakování (nebo výdrž) s tlačítky +/−
+// a přepínač, zda byla odcvičená.
 function editSlot(entry, slot) {
   return openDialog((close) => {
-    const numInput = (val) => el('input', { type: 'text', class: 'input', inputmode: 'decimal', value: val == null ? '' : String(val).replace('.', ','), autocomplete: 'off' });
-    const weight = entry.type === 'reps' ? null : numInput(slot.weight);
-    const reps = entry.type === 'time' ? null : numInput(slot.reps);
-    const seconds = entry.type === 'time' ? numInput(slot.seconds) : null;
+    const fmt = (v) => (v == null ? '' : new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2, useGrouping: false }).format(v));
+    const parse = (input) => parseFloat(String(input.value).replace(',', '.'));
+    const field = (label, value, step, min) => {
+      const input = el('input', { type: 'text', class: 'input edit-field', inputmode: 'decimal', value: fmt(value), autocomplete: 'off' });
+      const bump = (d) => {
+        let v = parse(input);
+        if (!Number.isFinite(v)) v = 0;
+        v = Math.round((v + d) * 100) / 100;
+        if (min != null && v < min) v = min;
+        input.value = fmt(v);
+      };
+      const root = el('div', { class: 'edit-row' }, [
+        el('span', { class: 'field-label', text: label }),
+        el('div', { class: 'stepper-row edit-stepper' }, [
+          el('button', { type: 'button', class: 'btn stepper-btn', text: '−', onclick: () => bump(-step) }),
+          input,
+          el('button', { type: 'button', class: 'btn stepper-btn', text: '+', onclick: () => bump(step) }),
+        ]),
+      ]);
+      return { root, input };
+    };
+    const weight = entry.type === 'reps' ? null : field(entry.bodyweight ? 'Přidaná váha (kg)' : 'Váha (kg)', slot.weight, entry.weightStep ?? 2.5, entry.bodyweight ? null : 0);
+    const reps = entry.type === 'time' ? null : field('Opakování', slot.reps, 1, 0);
+    const seconds = entry.type === 'time' ? field('Výdrž (s)', slot.seconds, 5, 0) : null;
     let done = slot.done;
     const doneBtn = el('button', {
       type: 'button', class: `btn btn-small ${done ? 'btn-primary' : ''}`, text: done ? 'Odcvičeno' : 'Neodcvičeno',
       onclick: () => { done = !done; doneBtn.textContent = done ? 'Odcvičeno' : 'Neodcvičeno'; doneBtn.classList.toggle('btn-primary', done); },
     });
-    const parse = (input) => parseFloat(String(input.value).replace(',', '.'));
     const form = el('form', { method: 'dialog', class: 'dialog-body' }, [
       el('h2', { class: 'dialog-title', text: 'Upravit sérii' }),
-      weight ? el('label', { class: 'field-label', text: entry.bodyweight ? 'Přidaná váha (kg)' : 'Váha (kg)' }) : null, weight,
-      reps ? el('label', { class: 'field-label', text: 'Opakování' }) : null, reps,
-      seconds ? el('label', { class: 'field-label', text: 'Výdrž (s)' }) : null, seconds,
+      weight?.root, reps?.root, seconds?.root,
       el('div', { class: 'note-next' }, [el('span', { class: 'muted small', text: 'Stav' }), doneBtn]),
       el('div', { class: 'dialog-actions' }, [
         el('button', { type: 'button', class: 'btn', text: 'Zrušit', onclick: () => close(false) }),
@@ -224,16 +246,12 @@ function editSlot(entry, slot) {
     ]);
     form.addEventListener('submit', (e) => {
       e.preventDefault();
-      if (weight) { const v = parse(weight); if (Number.isFinite(v)) slot.weight = Math.round(v * 100) / 100; }
-      if (reps) { const v = parse(reps); if (Number.isFinite(v)) slot.reps = Math.round(v); }
-      if (seconds) { const v = parse(seconds); if (Number.isFinite(v)) slot.seconds = Math.round(v); }
+      if (weight) { const v = parse(weight.input); if (Number.isFinite(v)) slot.weight = Math.round(v * 100) / 100; }
+      if (reps) { const v = parse(reps.input); if (Number.isFinite(v)) slot.reps = Math.round(v); }
+      if (seconds) { const v = parse(seconds.input); if (Number.isFinite(v)) slot.seconds = Math.round(v); }
       if (done !== slot.done) { slot.done = done; slot.doneAt = done ? new Date().toISOString() : null; }
       close(true);
     });
     return form;
   });
-}
-
-function kv(label, value) {
-  return el('div', { class: 'kv-row' }, [el('dt', { text: label }), el('dd', { text: value })]);
 }

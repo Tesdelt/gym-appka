@@ -472,7 +472,8 @@ select.input { padding-right: 32px; background-image: none; }
   flex: none; width: 36px; min-height: var(--tap); display: flex; align-items: center; justify-content: center;
   font-size: 22px; color: var(--text-2); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
 }
-.ex-row.is-dragging { background: var(--bg); box-shadow: 0 0 0 1px var(--accent); }
+.ex-row.is-dragging, .ex-row.is-picked { background: var(--bg); box-shadow: 0 0 0 1px var(--accent); }
+.ex-row.is-picked .drag-handle { color: var(--gold); }
 .drag-list .list-row { padding-right: 4px; }
 .sign-btn { flex: none; width: 48px; min-height: 56px; font-size: 26px; }
 .sign-btn.is-selected { background: var(--accent); border-color: var(--accent); }
@@ -482,3 +483,7 @@ select.input { padding-right: 32px; background-image: none; }
 .set-edit { display: flex; flex-direction: column; align-items: flex-start; gap: 0; padding: 4px 0; border: 0; background: none; color: var(--text); text-align: left; cursor: pointer; }
 .set-edit:active { color: var(--gold); }
 .edit-hint { color: var(--text-2); font-size: 13px; margin-bottom: 6px; }
+
+.edit-row { margin-bottom: 10px; }
+.edit-stepper .stepper-btn { min-height: 52px; }
+.edit-field { flex: 1 1 auto; min-width: 0; border: 0; text-align: center; font-family: var(--font-head); font-weight: 700; font-size: 26px; background: transparent; }

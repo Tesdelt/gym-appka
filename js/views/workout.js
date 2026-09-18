@@ -322,7 +322,7 @@ async function exerciseListSheet(workout, ctx) {
 
     body.append(
       el('h2', { class: 'dialog-title', text: 'Cviky v tréninku' }),
-      el('p', { class: 'muted small', text: 'Klepnutím přeskočíš na cvik, za ≡ přetáhneš pořadí.' }),
+      el('p', { class: 'muted small', text: 'Klepnutím na název přeskočíš na cvik. Pořadí změníš tažením za ≡, nebo klepni na ≡ u cviku a pak na ≡ tam, kam ho chceš vložit.' }),
       list,
       el('div', { class: 'dialog-actions' }, [
         el('button', { type: 'button', class: 'btn', text: '+ Přidat cvik', onclick: add }),
@@ -330,39 +330,78 @@ async function exerciseListSheet(workout, ctx) {
       ]),
     );
 
-    // Přetahování: řádek se za úchyt táhne prstem, ostatní se mu vyhýbají.
+    // Přetahování: řádek se za úchyt táhne prstem (touch i myš), ostatní se
+    // mu vyhýbají. Pouhé klepnutí na úchyt cvik „vezme“ a další klepnutí
+    // na jiný úchyt ho vloží před něj (náhrada tažení, když nefunguje).
+    let picked = null;
+    function commitOrder() {
+      const order = [...list.children].map((r) => Number(r.dataset.index));
+      if (order.some((v, i) => v !== i)) {
+        const currentUid = workout.cursor ? workout.exercises[workout.cursor.ex]?.uid : null;
+        workout.exercises = order.map((i) => workout.exercises[i]);
+        if (currentUid) workout.cursor.ex = workout.exercises.findIndex((e) => e.uid === currentUid);
+        ctx.save(); ctx.draw();
+      }
+      picked = null;
+      draw();
+    }
+    function moveRowTo(row, clientY) {
+      const rows = [...list.children].filter((r) => r !== row);
+      const target = rows.find((r) => {
+        const b = r.getBoundingClientRect();
+        return clientY < b.top + b.height / 2;
+      });
+      if (target) list.insertBefore(row, target);
+      else list.append(row);
+    }
     function attachDrag(row) {
       const handle = row.querySelector('.drag-handle');
-      handle.addEventListener('pointerdown', (e) => {
+      if (picked !== null && Number(row.dataset.index) === picked) row.classList.add('is-picked');
+
+      // Klepnutí (bez tažení): vzít / vložit
+      handle.addEventListener('click', () => {
+        if (row.dataset.moved === '1') { row.dataset.moved = ''; return; }
+        const idx = Number(row.dataset.index);
+        if (picked === null) { picked = idx; draw(); return; }
+        if (picked === idx) { picked = null; draw(); return; }
+        const pickedRow = [...list.children].find((r) => Number(r.dataset.index) === picked);
+        list.insertBefore(pickedRow, row);
+        commitOrder();
+      });
+
+      // Tažení prstem
+      handle.addEventListener('touchstart', (e) => {
         e.preventDefault();
-        handle.setPointerCapture(e.pointerId);
+        let moved = false;
         row.classList.add('is-dragging');
-        const onMove = (ev) => {
-          const rows = [...list.children].filter((r) => r !== row);
-          const target = rows.find((r) => {
-            const b = r.getBoundingClientRect();
-            return ev.clientY < b.top + b.height / 2;
-          });
-          if (target) list.insertBefore(row, target);
-          else list.append(row);
-        };
-        const onUp = () => {
-          handle.removeEventListener('pointermove', onMove);
-          handle.removeEventListener('pointerup', onUp);
-          handle.removeEventListener('pointercancel', onUp);
+        const onMove = (ev) => { moved = true; moveRowTo(row, ev.touches[0].clientY); };
+        const onEnd = () => {
+          handle.removeEventListener('touchmove', onMove);
+          handle.removeEventListener('touchend', onEnd);
+          handle.removeEventListener('touchcancel', onEnd);
           row.classList.remove('is-dragging');
-          const order = [...list.children].map((r) => Number(r.dataset.index));
-          if (order.some((v, i) => v !== i)) {
-            const currentUid = workout.cursor ? workout.exercises[workout.cursor.ex]?.uid : null;
-            workout.exercises = order.map((i) => workout.exercises[i]);
-            if (currentUid) workout.cursor.ex = workout.exercises.findIndex((e) => e.uid === currentUid);
-            ctx.save(); ctx.draw();
-          }
-          draw();
+          if (moved) { row.dataset.moved = '1'; commitOrder(); }
+          else handle.click();
         };
-        handle.addEventListener('pointermove', onMove);
-        handle.addEventListener('pointerup', onUp);
-        handle.addEventListener('pointercancel', onUp);
+        handle.addEventListener('touchmove', onMove, { passive: false });
+        handle.addEventListener('touchend', onEnd);
+        handle.addEventListener('touchcancel', onEnd);
+      }, { passive: false });
+
+      // Tažení myší
+      handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        let moved = false;
+        row.classList.add('is-dragging');
+        const onMove = (ev) => { moved = true; moveRowTo(row, ev.clientY); };
+        const onUp = () => {
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('mouseup', onUp);
+          row.classList.remove('is-dragging');
+          if (moved) { row.dataset.moved = '1'; commitOrder(); }
+        };
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
       });
     }
 
