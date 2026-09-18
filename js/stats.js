@@ -6,6 +6,7 @@
 import { getAll, put, remove, newId } from './db.js';
 import { slotsOf } from './recommend.js';
 import { formatWeight } from './ui.js';
+import { t, exName } from './i18n.js';
 
 export const EX_RECORD = 'ex-record';
 
@@ -38,7 +39,7 @@ export function manualAsWorkouts(manual, exercises) {
       startedAt: m.date,
       gymId: m.gymId,
       exercises: [{
-        uid: m.id, exerciseId: ex.id, name: ex.name, type: ex.type, bodyweight: Boolean(ex.bodyweight), perGym: Boolean(ex.perGym),
+        uid: m.id, exerciseId: ex.id, name: exName(ex), type: ex.type, bodyweight: Boolean(ex.bodyweight), perGym: Boolean(ex.perGym),
         mode: 'sets', sets: [{ done: true, weight: m.weight ?? 0, reps: m.reps ?? null, seconds: m.seconds ?? null }],
       }],
     });
@@ -81,9 +82,9 @@ export function exerciseFormat(exercise) {
 }
 
 export function exerciseChartTitle(exercise) {
-  if (exercise.type === 'time') return 'Nejdelší výdrž';
-  if (exercise.type === 'reps') return 'Nejvíc opakování v sérii';
-  return exercise.bodyweight ? 'Nejvyšší přidaná váha (kg)' : 'Nejvyšší váha (kg)';
+  if (exercise.type === 'time') return t('Nejdelší výdrž');
+  if (exercise.type === 'reps') return t('Nejvíc opakování v sérii');
+  return exercise.bodyweight ? t('Nejvyšší přidaná váha (kg)') : t('Nejvyšší váha (kg)');
 }
 
 // ---------- Frekvence ----------

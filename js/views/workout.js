@@ -14,6 +14,7 @@ import {
   getActiveWorkout, saveWorkout, deleteWorkout, currentSlot, completeCurrent, nextUndone, firstUndoneIn,
   positionAfterConfirm, prevInOrder, adjacentExercise, listDoneWorkouts, slotLabel, restAfter, entryDone, elapsedSeconds, formatDuration, buildAdHocEntry,
 } from '../workout.js';
+import { t, locale, exName } from '../i18n.js';
 
 export const title = '';
 export const tab = 'domu';
@@ -21,10 +22,10 @@ export const tab = 'domu';
 export async function render(container, { extraEl, titleEl }) {
   const workout = await getActiveWorkout();
   if (!workout) {
-    titleEl.textContent = 'Trénink';
+    titleEl.textContent = t('Trénink');
     container.append(el('section', { class: 'card' }, [
-      el('h2', { class: 'card-title', text: 'Žádný rozdělaný trénink' }),
-      el('button', { type: 'button', class: 'btn btn-primary', text: 'Na Domů', onclick: () => navigate('domu') }),
+      el('h2', { class: 'card-title', text: t('Žádný rozdělaný trénink') }),
+      el('button', { type: 'button', class: 'btn btn-primary', text: t('Na Domů'), onclick: () => navigate('domu') }),
     ]));
     return;
   }
@@ -44,7 +45,7 @@ export async function render(container, { extraEl, titleEl }) {
   }, 1000);
 
   let saveTimer = null;
-  const save = () => saveWorkout(workout).catch((err) => { console.error(err); toast('Uložení selhalo'); });
+  const save = () => saveWorkout(workout).catch((err) => { console.error(err); toast(t('Uložení selhalo')); });
   const saveLater = () => { clearTimeout(saveTimer); saveTimer = setTimeout(save, 400); };
   const [exercises, done, manual] = await Promise.all([exerciseMap(), listDoneWorkouts(), listManualRecords()]);
   const prior = [...done, ...manualAsWorkouts(manual, exercises)];
@@ -75,8 +76,8 @@ export async function render(container, { extraEl, titleEl }) {
   };
 
   extraEl.append(
-    el('button', { type: 'button', class: 'btn btn-small', text: 'Cviky', onclick: () => exerciseListSheet(workout, ctx) }),
-    el('button', { type: 'button', class: 'btn btn-small btn-danger', text: 'Ukončit', onclick: () => endWorkout(workout, ctx) }),
+    el('button', { type: 'button', class: 'btn btn-small', text: t('Cviky'), onclick: () => exerciseListSheet(workout, ctx) }),
+    el('button', { type: 'button', class: 'btn btn-small btn-danger', text: t('Ukončit'), onclick: () => endWorkout(workout, ctx) }),
   );
 
   ctx.draw();
@@ -85,11 +86,11 @@ export async function render(container, { extraEl, titleEl }) {
 async function endWorkout(workout, ctx) {
   const anyDone = workout.exercises.some((e) => slotsOf(e).some((s) => s.done));
   if (!anyDone) {
-    const ok = await confirmDialog({ title: 'Zahodit trénink?', text: 'Žádná série není odcvičená, trénink se neuloží.', okLabel: 'Zahodit', danger: true });
+    const ok = await confirmDialog({ title: t('Zahodit trénink?'), text: t('Žádná série není odcvičená, trénink se neuloží.'), okLabel: t('Zahodit'), danger: true });
     if (ok) { await deleteWorkout(workout.id); navigate('domu'); }
     return;
   }
-  const ok = await confirmDialog({ title: 'Ukončit trénink?', text: 'Zobrazí se souhrn, trénink se uloží až po potvrzení.', okLabel: 'Ukončit', danger: true });
+  const ok = await confirmDialog({ title: t('Ukončit trénink?'), text: t('Zobrazí se souhrn, trénink se uloží až po potvrzení.'), okLabel: t('Ukončit'), danger: true });
   if (ok) {
     workout.endedAt = new Date().toISOString();
     await ctx.save();
@@ -102,21 +103,21 @@ function screen(workout, ctx) {
 
   if (!workout.exercises.length) {
     return [el('section', { class: 'card' }, [
-      el('h2', { class: 'card-title', text: 'Šablona nemá žádné cviky' }),
-      el('p', { class: 'muted small', text: 'Přidej cvik přes tlačítko Cviky nahoře, nebo trénink ukonči.' }),
+      el('h2', { class: 'card-title', text: t('Šablona nemá žádné cviky') }),
+      el('p', { class: 'muted small', text: t('Přidej cvik přes tlačítko Cviky nahoře, nebo trénink ukonči.') }),
     ])];
   }
   if (!cur) {
     return [el('section', { class: 'card card-done' }, [
-      el('h2', { class: 'card-title', text: 'Všechny série hotové' }),
-      el('p', { class: 'muted small', text: 'Ukonči trénink tlačítkem nahoře, nebo ještě přidej cvik.' }),
+      el('h2', { class: 'card-title', text: t('Všechny série hotové') }),
+      el('p', { class: 'muted small', text: t('Ukonči trénink tlačítkem nahoře, nebo ještě přidej cvik.') }),
       el('button', {
-        type: 'button', class: 'btn', text: 'Zpět na poslední sérii',
+        type: 'button', class: 'btn', text: t('Zpět na poslední sérii'),
         onclick: () => { workout.cursor = lastPosition(workout); ctx.save(); ctx.draw(); },
       }),
     ])];
   }
-  return [currentCard(workout, cur, ctx), nextPreview(workout)];
+  return [currentCard(workout, cur, ctx), nextPreview(workout, ctx)];
 }
 
 function lastPosition(workout) {
@@ -133,7 +134,7 @@ function currentCard(workout, cur, ctx) {
 
   // Hlavička
   card.append(el('div', { class: 'ex-head' }, [
-    el('h2', { class: 'ex-name', text: entry.name }),
+    el('h2', { class: 'ex-name', text: nameOf(entry, ctx) }),
     el('span', { class: 'ex-set', text: slotLabel(entry, index) }),
   ]));
 
@@ -142,21 +143,21 @@ function currentCard(workout, cur, ctx) {
 
   // Obrázek + minule / doporučení
   card.append(el('div', { class: 'ex-media' }, [
-    el('button', { type: 'button', class: 'ex-image', 'aria-label': 'Podrobnosti cviku', onclick: () => navigate(`cvik/${encodeURIComponent(entry.exerciseId)}`) }, [
+    el('button', { type: 'button', class: 'ex-image', 'aria-label': t('Podrobnosti cviku'), onclick: () => navigate(`cvik/${encodeURIComponent(entry.exerciseId)}`) }, [
       Object.assign(imageBox(ctx.exercises.get(entry.exerciseId), { cls: 'ex-image-pic' }), { style: 'view-transition-name: ex-image' }),
-      el('span', { class: 'ex-image-label', text: 'Podrobnosti' }),
+      el('span', { class: 'ex-image-label', text: t('Podrobnosti') }),
     ]),
     el('div', { class: 'ex-meta' }, [
       el('button', {
-        type: 'button', class: 'btn btn-small btn-skip', text: 'Přeskočit cvik »',
+        type: 'button', class: 'btn btn-small btn-skip', text: t('Přeskočit cvik »'),
         onclick: () => {
           entry.skipped = true;
-          toast(`${entry.name} přeskočen`);
+          toast(t('{name} přeskočen', { name: nameOf(entry, ctx) }));
           ctx.move(1, () => { workout.cursor = nextUndone(workout, { ex: workout.cursor.ex, slot: 999 }); });
         },
       }),
-      metaRow(entry.last ? `Minule ${dateShort.format(new Date(entry.last.date))}` : 'Minule', entry.last ? formatValues(entry, entry.last.values) : 'poprvé'),
-      metaRow(entry.goal?.applied ? 'Doporučení podle cíle' : 'Doporučení', rec ? formatValues(entry, [rec]) : '–'),
+      metaRow(entry.last ? t('Minule {date}', { date: dateShort.format(new Date(entry.last.date)) }) : t('Minule'), entry.last ? formatValues(entry, entry.last.values) : t('poprvé')),
+      metaRow(entry.goal?.applied ? t('Doporučení podle cíle') : t('Doporučení'), rec ? formatValues(entry, [rec]) : '–'),
     ]),
     cd?.root,
   ]));
@@ -165,28 +166,28 @@ function currentCard(workout, cur, ctx) {
   const steppers = [];
   if (entry.type !== 'reps') {
     steppers.push(stepper({
-      label: entry.bodyweight ? 'Přidaná váha' : 'Váha', unit: 'kg',
+      label: entry.bodyweight ? t('Přidaná váha') : t('Váha'), unit: 'kg',
       value: () => slot.weight, display: (v) => weightDisplay(v, entry.bodyweight),
       step: entry.weightStep, min: entry.bodyweight ? null : 0,
-      set: (v) => { slot.weight = v; ctx.save(); }, editTitle: 'Váha (kg)',
+      set: (v) => { slot.weight = v; ctx.save(); }, editTitle: t('Váha (kg)'),
     }));
   }
   if (entry.type === 'time') {
     steppers.push(stepper({
-      label: 'Výdrž', unit: 's', value: () => slot.seconds, display: (v) => String(v), step: 5, min: 5, snap: true,
-      set: (v) => { slot.seconds = Math.round(v); ctx.save(); cd.refresh(); }, editTitle: 'Výdrž (s)', intStep: true,
+      label: t('Výdrž'), unit: 's', value: () => slot.seconds, display: (v) => String(v), step: 5, min: 5, snap: true,
+      set: (v) => { slot.seconds = Math.round(v); ctx.save(); cd.refresh(); }, editTitle: t('Výdrž (s)'), intStep: true,
     }));
   } else {
     steppers.push(stepper({
-      label: 'Opakování', unit: '', value: () => slot.reps, display: (v) => String(v), step: 1, min: 0,
-      set: (v) => { slot.reps = Math.round(v); ctx.save(); }, editTitle: 'Opakování', intStep: true,
+      label: t('Opakování'), unit: '', value: () => slot.reps, display: (v) => String(v), step: 1, min: 0,
+      set: (v) => { slot.reps = Math.round(v); ctx.save(); }, editTitle: t('Opakování'), intStep: true,
     }));
   }
   card.append(el('div', { class: 'steppers' }, steppers.map((s) => s.root)));
   // Doporučení + pauza
   card.append(el('div', { class: 'row-2' }, [
     el('button', {
-      type: 'button', class: 'btn', text: 'Použít doporučení', disabled: rec ? null : '',
+      type: 'button', class: 'btn', text: t('Použít doporučení'), disabled: rec ? null : '',
       onclick: () => {
         if (rec.weight != null) slot.weight = rec.weight;
         if (rec.reps != null) slot.reps = rec.reps;
@@ -196,8 +197,8 @@ function currentCard(workout, cur, ctx) {
       },
     }),
     el('div', { class: 'rest-info' }, [
-      el('span', { class: 'muted small', text: 'Pauza' }),
-      el('span', { class: 'rest-value', text: rest ? formatRest(rest) : 'bez pauzy' }),
+      el('span', { class: 'muted small', text: t('Pauza') }),
+      el('span', { class: 'rest-value', text: rest ? formatRest(rest) : t('bez pauzy') }),
     ]),
   ]));
 
@@ -207,13 +208,13 @@ function currentCard(workout, cur, ctx) {
   const toNextExercise = Boolean(after) && after.ex !== workout.cursor.ex;
   let label;
   let arrow;
-  if (!after) { label = slot.done ? 'Uložit' : 'Hotovo'; arrow = '✓'; }
-  else if (toNextExercise) { label = 'Další cvik'; arrow = '⇥'; }
-  else { label = slot.done ? 'Uložit' : 'Hotovo'; arrow = '→'; }
+  if (!after) { label = slot.done ? t('Uložit') : t('Hotovo'); arrow = '✓'; }
+  else if (toNextExercise) { label = t('Další cvik'); arrow = '⇥'; }
+  else { label = slot.done ? t('Uložit') : t('Hotovo'); arrow = '→'; }
 
   card.append(el('div', { class: 'nav-row' }, [
     el('button', {
-      type: 'button', class: 'btn btn-back', text: '←', 'aria-label': 'Předchozí série', disabled: prev ? null : '',
+      type: 'button', class: 'btn btn-back', text: '←', 'aria-label': t('Předchozí série'), disabled: prev ? null : '',
       onclick: () => ctx.move(-1, () => { workout.cursor = prev; }),
     }),
     el('button', {
@@ -221,12 +222,12 @@ function currentCard(workout, cur, ctx) {
       onclick: () => {
         if (cd) {
           const held = cd.heldSeconds();
-          if (held != null && held < slot.seconds) { slot.seconds = Math.max(1, held); toast(`Zapsáno ${slot.seconds} s`); }
+          if (held != null && held < slot.seconds) { slot.seconds = Math.max(1, held); toast(t('Zapsáno {n} s', { n: slot.seconds })); }
           cd.stop();
         }
         const record = isNewRecord(workout, cur, ctx);
         card.classList.add('is-confirmed');
-        if (record) { cur.slot.pr = true; celebrate(); toast('Nový osobní rekord!'); }
+        if (record) { cur.slot.pr = true; celebrate(); toast(t('Nový osobní rekord!')); }
         ctx.move(1, () => completeCurrent(workout));
       },
     }, [el('span', { class: 'btn-done-label', text: label }), el('span', { class: 'btn-done-arrow', text: arrow })]),
@@ -234,12 +235,12 @@ function currentCard(workout, cur, ctx) {
 
   // Poznámka a volba na příště
   const note = el('input', {
-    type: 'text', class: 'input note-input', placeholder: 'Poznámka k cviku…', autocomplete: 'off',
+    type: 'text', class: 'input note-input', placeholder: t('Poznámka k cviku…'), autocomplete: 'off',
     oninput: (e) => { entry.note = e.target.value; ctx.saveLater(); },
   });
   note.value = entry.note ?? '';
-  const choices = [['less', 'Snížit'], ['keep', 'Nechat'], ['more', 'Přidat']];
-  const seg = el('div', { class: 'segmented', role: 'group', 'aria-label': 'Na příště' },
+  const choices = [['less', t('Snížit')], ['keep', t('Nechat')], ['more', t('Přidat')]];
+  const seg = el('div', { class: 'segmented', role: 'group', 'aria-label': t('Na příště') },
     choices.map(([value, text]) => el('button', {
       type: 'button', class: `seg ${(entry.next ?? 'keep') === value ? 'is-selected' : ''}`, text,
       onclick: (e) => {
@@ -250,7 +251,7 @@ function currentCard(workout, cur, ctx) {
     })));
   card.append(el('div', { class: 'note-block' }, [
     note,
-    el('div', { class: 'note-next' }, [el('span', { class: 'muted small', text: 'Na příště' }), seg]),
+    el('div', { class: 'note-next' }, [el('span', { class: 'muted small', text: t('Na příště') }), seg]),
   ]));
 
   // přejetí prstem: doleva další cvik, doprava předchozí (bez potvrzení)
@@ -277,6 +278,11 @@ function isNewRecord(workout, cur, ctx) {
   return Boolean(at) && slot.reps > at.value;
 }
 
+// Název cviku v aktuálním jazyce (v tréninku je uložený jen český název)
+function nameOf(entry, ctx) {
+  return exName(ctx.exercises.get(entry.exerciseId), entry.name);
+}
+
 function metaRow(label, value) {
   return el('div', { class: 'meta-row' }, [
     el('span', { class: 'muted small', text: label }),
@@ -291,7 +297,7 @@ function recommendationFor(entry, index) {
 }
 
 function weightDisplay(kg, bodyweight) {
-  const num = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2 }).format(Math.abs(kg));
+  const num = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(Math.abs(kg));
   if (!bodyweight) return num;
   if (kg > 0) return `+${num}`;
   if (kg < 0) return `−${num}`;
@@ -307,7 +313,7 @@ function stepper({ label, unit, value, display, step, min, set, editTitle, intSt
   const curEl = el('span', { class: 'sv sv-cur' });
   const nextEl = el('span', { class: 'sv sv-next', 'aria-hidden': 'true' });
   const track = el('span', { class: 'sv-track' }, [prevEl, curEl, nextEl]);
-  const num = el('button', { type: 'button', class: 'stepper-value', 'aria-label': `${label}: upravit` }, [track]);
+  const num = el('button', { type: 'button', class: 'stepper-value', 'aria-label': t('{label}: upravit', { label }) }, [track]);
   const refresh = () => {
     const v = value();
     curEl.textContent = display(v);
@@ -365,7 +371,7 @@ function slideValue(track, curEl, dir) {
 function countdown(getSeconds) {
   const big = el('span', { class: 'cd-big' });
   const small = el('span', { class: 'cd-small' });
-  const btn = el('button', { type: 'button', class: 'countdown-btn', 'aria-label': 'Odpočet výdrže' }, [big, small]);
+  const btn = el('button', { type: 'button', class: 'countdown-btn', 'aria-label': t('Odpočet výdrže') }, [big, small]);
   let left = null; // zbývající ms (pauza), null = připraveno
   let total = null; // délka právě běžícího / pozastaveného odpočtu (ms)
   let endAt = null; // běží do tohoto času
@@ -380,7 +386,7 @@ function countdown(getSeconds) {
     cancelAnimationFrame(raf);
     btn.classList.remove('is-running', 'is-paused', 'is-final');
     big.textContent = fmt(getSeconds());
-    small.textContent = 'Start';
+    small.textContent = t('Start');
     setRing(1);
     release();
   };
@@ -397,7 +403,7 @@ function countdown(getSeconds) {
       shockwave(r.left + r.width / 2, r.top + r.height / 2);
       idle();
       big.textContent = '✓';
-      small.textContent = 'Hotovo';
+      small.textContent = t('Hotovo');
       setTimeout(() => { if (endAt == null && left == null && btn.isConnected) idle(); }, 1800);
       return;
     }
@@ -412,7 +418,7 @@ function countdown(getSeconds) {
       btn.classList.remove('is-running', 'is-final');
       btn.classList.add('is-paused');
       big.textContent = fmt(Math.ceil(left / 1000));
-      small.textContent = 'Pokračovat';
+      small.textContent = t('Pokračovat');
       release();
       return;
     }
@@ -421,7 +427,7 @@ function countdown(getSeconds) {
     left = null;
     btn.classList.remove('is-paused');
     btn.classList.add('is-running');
-    small.textContent = 'Stop';
+    small.textContent = t('Stop');
     try { wakeLock = await navigator.wakeLock?.request('screen'); } catch { /* nepodporováno */ }
     tick();
   });
@@ -440,7 +446,7 @@ function countdown(getSeconds) {
 }
 
 // ---------- Náhled dalšího cviku ----------
-function nextPreview(workout) {
+function nextPreview(workout, ctx) {
   const c = workout.cursor;
   let next = null;
   for (let i = c.ex + 1; i < workout.exercises.length; i++) {
@@ -452,15 +458,15 @@ function nextPreview(workout) {
     }
   }
   return el('section', { class: 'card card-next' }, [
-    el('span', { class: 'muted small', text: next ? 'Další cvik' : 'Poslední cvik v tréninku' }),
-    next ? el('span', { class: 'next-name' }, [next.name, el('span', { class: 'muted small', text: ` · ${describeEntry(next)}` })]) : null,
+    el('span', { class: 'muted small', text: next ? t('Další cvik') : t('Poslední cvik v tréninku') }),
+    next ? el('span', { class: 'next-name' }, [nameOf(next, ctx), el('span', { class: 'muted small', text: ` · ${describeEntry(next)}` })]) : null,
   ]);
 }
 
 function describeEntry(entry) {
   const slots = slotsOf(entry);
   const first = slots[0];
-  if (entry.mode === 'dropset') return `drop set, ${entry.rounds.length} kola × ${entry.rounds[0].steps.length} váhy`;
+  if (entry.mode === 'dropset') return t('drop set, {rounds} kola × {steps} váhy', { rounds: entry.rounds.length, steps: entry.rounds[0].steps.length });
   const weight = entry.type === 'reps' ? '' : `${formatWeight(first.weight, { bodyweight: entry.bodyweight })}, `;
   const value = entry.type === 'time' ? `${first.seconds} s` : `${first.reps}`;
   return `${weight}${slots.length} × ${value}`;
@@ -483,11 +489,11 @@ async function exerciseListSheet(workout, ctx) {
             type: 'button', class: 'list-main',
             onclick: () => { entry.skipped = false; workout.cursor = { ex: i, slot: firstUndoneIn(entry) }; ctx.save(); close(); ctx.draw(); },
           }, [
-            el('span', { class: 'block', text: entry.name }),
-            el('span', { class: `muted small block ${doneCount === slots.length ? 'is-done' : ''}`, text: entry.skipped ? 'přeskočeno · klepnutím vrátíš' : `${doneCount}/${slots.length} hotovo${isCurrent ? ' · právě cvičím' : ''}` }),
+            el('span', { class: 'block', text: nameOf(entry, ctx) }),
+            el('span', { class: `muted small block ${doneCount === slots.length ? 'is-done' : ''}`, text: entry.skipped ? t('přeskočeno · klepnutím vrátíš') : t('{done}/{total} hotovo', { done: doneCount, total: slots.length }) + (isCurrent ? t(' · právě cvičím') : '') }),
           ]),
-          el('button', { type: 'button', class: 'btn btn-small', text: 'Nahradit', onclick: () => replace(i) }),
-          el('button', { type: 'button', class: 'btn btn-small btn-icon', html: '&times;', 'aria-label': 'Odebrat', onclick: () => removeAt(i) }),
+          el('button', { type: 'button', class: 'btn btn-small', text: t('Nahradit'), onclick: () => replace(i) }),
+          el('button', { type: 'button', class: 'btn btn-small btn-icon', html: '&times;', 'aria-label': t('Odebrat'), onclick: () => removeAt(i) }),
         ]);
         return row;
       }));
@@ -500,12 +506,12 @@ async function exerciseListSheet(workout, ctx) {
     };
 
     body.append(
-      el('h2', { class: 'dialog-title', text: 'Cviky v tréninku' }),
-      el('p', { class: 'muted small', text: 'Klepnutím na název přeskočíš na cvik. Pořadí změníš tažením za ≡, nebo klepni na ≡ u cviku a pak na ≡ tam, kam ho chceš vložit.' }),
+      el('h2', { class: 'dialog-title', text: t('Cviky v tréninku') }),
+      el('p', { class: 'muted small', text: t('Klepnutím na název přeskočíš na cvik. Pořadí změníš tažením za ≡, nebo klepni na ≡ u cviku a pak na ≡ tam, kam ho chceš vložit.') }),
       list,
       el('div', { class: 'dialog-actions' }, [
-        el('button', { type: 'button', class: 'btn', text: '+ Přidat cvik', onclick: add }),
-        el('button', { type: 'button', class: 'btn btn-primary', text: 'Zavřít', onclick: () => close() }),
+        el('button', { type: 'button', class: 'btn', text: t('+ Přidat cvik'), onclick: add }),
+        el('button', { type: 'button', class: 'btn btn-primary', text: t('Zavřít'), onclick: () => close() }),
       ]),
     );
 
@@ -518,7 +524,7 @@ async function exerciseListSheet(workout, ctx) {
     };
     async function removeAt(i) {
       const entry = workout.exercises[i];
-      const ok = await confirmDialog({ title: `Odebrat „${entry.name}“?`, okLabel: 'Odebrat', danger: true });
+      const ok = await confirmDialog({ title: t('Odebrat „{name}“?', { name: nameOf(entry, ctx) }), okLabel: t('Odebrat'), danger: true });
       if (!ok) return;
       workout.exercises.splice(i, 1);
       if (workout.cursor && workout.cursor.ex > i) workout.cursor.ex -= 1;
@@ -527,14 +533,14 @@ async function exerciseListSheet(workout, ctx) {
       ctx.save(); draw(); ctx.draw();
     }
     async function add() {
-      const exercise = await pickExercise({ title: 'Přidat cvik' });
+      const exercise = await pickExercise({ title: t('Přidat cvik') });
       if (!exercise) return;
       workout.exercises.push(await buildAdHocEntry(exercise, workout.gymId, await listTemplates()));
       fixCursor();
       ctx.save(); draw(); ctx.draw();
     }
     async function replace(i) {
-      const exercise = await pickExercise({ title: 'Nahradit cvik' });
+      const exercise = await pickExercise({ title: t('Nahradit cvik') });
       if (!exercise) return;
       workout.exercises[i] = await buildAdHocEntry(exercise, workout.gymId, await listTemplates());
       if (workout.cursor?.ex === i) workout.cursor.slot = 0;
@@ -575,7 +581,7 @@ function bubblePattern() {
 let bubbles = null;
 
 function progressBar(onJump) {
-  const root = el('div', { class: 'wprog', role: 'progressbar', 'aria-label': 'Postup tréninku, klepnutím přejdeš na sérii', 'aria-valuemin': 0, 'aria-valuemax': 100 });
+  const root = el('div', { class: 'wprog', role: 'progressbar', 'aria-label': t('Postup tréninku, klepnutím přejdeš na sérii'), 'aria-valuemin': 0, 'aria-valuemax': 100 });
   bubbles ??= bubblePattern();
   root.style.setProperty('--bubbles', bubbles);
   // klepnutí: cvik podle bloku, série podle místa v bloku

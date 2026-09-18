@@ -1,5 +1,7 @@
 // Společné UI prvky: dialogy (výzva, potvrzení), formát čísel.
 
+import { t, locale, plural as i18nPlural } from './i18n.js';
+
 export function el(tag, attrs = {}, children = []) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
@@ -16,9 +18,11 @@ export function el(tag, attrs = {}, children = []) {
   return node;
 }
 
-export function openDialog(build) {
+// Dialog. cls = další třída (např. 'dialog-full' přes celou obrazovku),
+// focus = automaticky zaměřit první pole (na iPhonu otevře klávesnici).
+export function openDialog(build, { cls = '', focus = true } = {}) {
   return new Promise((resolve) => {
-    const dialog = el('dialog', { class: 'dialog' });
+    const dialog = el('dialog', { class: `dialog ${cls}`.trim() });
     let closing = false;
     const close = (value) => {
       if (closing) return;
@@ -34,13 +38,13 @@ export function openDialog(build) {
     dialog.addEventListener('click', (e) => { if (e.target === dialog) close(null); });
     document.body.append(dialog);
     dialog.showModal();
-    const input = dialog.querySelector('input, textarea');
+    const input = focus ? dialog.querySelector('input, textarea') : null;
     if (input) { input.focus(); input.select?.(); }
   });
 }
 
 // Textová výzva. Vrátí zadaný text, nebo null při zrušení.
-export function promptText({ title, label = '', value = '', placeholder = '', okLabel = 'Uložit' }) {
+export function promptText({ title, label = '', value = '', placeholder = '', okLabel = t('Uložit') }) {
   return openDialog((close) => {
     const input = el('input', { type: 'text', class: 'input', value, placeholder, autocomplete: 'off', autocapitalize: 'sentences' });
     const form = el('form', { method: 'dialog', class: 'dialog-body' }, [
@@ -48,7 +52,7 @@ export function promptText({ title, label = '', value = '', placeholder = '', ok
       label ? el('label', { class: 'field-label', text: label }) : null,
       input,
       el('div', { class: 'dialog-actions' }, [
-        el('button', { type: 'button', class: 'btn', text: 'Zrušit', onclick: () => close(null) }),
+        el('button', { type: 'button', class: 'btn', text: t('Zrušit'), onclick: () => close(null) }),
         el('button', { type: 'submit', class: 'btn btn-primary', text: okLabel }),
       ]),
     ]);
@@ -66,22 +70,22 @@ export function promptText({ title, label = '', value = '', placeholder = '', ok
 // a přijímáme čárku i tečku. Záporné hodnoty (guma) přes tlačítko znaménka.
 export function promptNumber({ title, value = 0, step = 'any', min = null, unit = '' }) {
   return openDialog((close) => {
-    const numFormat = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2, useGrouping: false });
+    const numFormat = new Intl.NumberFormat(locale, { maximumFractionDigits: 2, useGrouping: false });
     const input = el('input', {
       type: 'text', class: 'input input-number', value: numFormat.format(Math.abs(value)),
       inputmode: step === 1 ? 'numeric' : 'decimal', autocomplete: 'off',
     });
     let negative = value < 0;
     const sign = el('button', {
-      type: 'button', class: `btn sign-btn ${negative ? 'is-selected' : ''}`, text: '−', 'aria-label': 'Záporná hodnota (s dopomocí)',
+      type: 'button', class: `btn sign-btn ${negative ? 'is-selected' : ''}`, text: '−', 'aria-label': t('Záporná hodnota (s dopomocí)'),
       onclick: () => { negative = !negative; sign.classList.toggle('is-selected', negative); input.focus(); },
     });
     const form = el('form', { method: 'dialog', class: 'dialog-body' }, [
       el('h2', { class: 'dialog-title', text: title }),
       el('div', { class: 'input-row' }, [min == null ? sign : null, input, unit ? el('span', { class: 'input-unit', text: unit }) : null]),
       el('div', { class: 'dialog-actions' }, [
-        el('button', { type: 'button', class: 'btn', text: 'Zrušit', onclick: () => close(null) }),
-        el('button', { type: 'submit', class: 'btn btn-primary', text: 'Použít' }),
+        el('button', { type: 'button', class: 'btn', text: t('Zrušit'), onclick: () => close(null) }),
+        el('button', { type: 'submit', class: 'btn btn-primary', text: t('Použít') }),
       ]),
     ]);
     form.addEventListener('submit', (e) => {
@@ -99,7 +103,7 @@ export function promptNumber({ title, value = 0, step = 'any', min = null, unit 
 // Číselné pole s tlačítky +/− a možností ručního zadání (čárka i tečka).
 // Vrací { root, input, value() }.
 export function stepField(label, value, step, min = null, onChange = null, { snap = false } = {}) {
-  const fmt = (v) => (v == null || !Number.isFinite(v) ? '' : new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2, useGrouping: false }).format(v));
+  const fmt = (v) => (v == null || !Number.isFinite(v) ? '' : new Intl.NumberFormat(locale, { maximumFractionDigits: 2, useGrouping: false }).format(v));
   const read = () => parseFloat(String(input.value).replace(',', '.').replace(/\s/g, ''));
   const input = el('input', { type: 'text', class: 'input edit-field', inputmode: 'decimal', value: fmt(value), autocomplete: 'off' });
   const bump = (d) => {
@@ -196,23 +200,21 @@ export function makeSortable(list, onReorder) {
 }
 
 export function dragHandle() {
-  return el('span', { class: 'drag-handle', 'aria-label': 'Přesunout', html: '&#8801;' });
+  return el('span', { class: 'drag-handle', 'aria-label': t('Přesunout'), html: '&#8801;' });
 }
 
-// Skloňování: plural(4, ['cvik', 'cviky', 'cviků']) → „4 cviky“
-export function plural(n, forms) {
-  const abs = Math.abs(n);
-  const form = abs === 1 ? forms[0] : abs >= 2 && abs <= 4 ? forms[1] : forms[2];
-  return `${n} ${form}`;
+// Skloňování: plural(4, ['cvik', 'cviky', 'cviků'], ['exercise', 'exercises']) → „4 cviky“
+export function plural(n, forms, enForms = null) {
+  return i18nPlural(n, forms, enForms);
 }
 
 // Potvrzení. Vrátí true/false.
-export function confirmDialog({ title, text = '', okLabel = 'Potvrdit', danger = false }) {
+export function confirmDialog({ title, text = '', okLabel = t('Potvrdit'), danger = false }) {
   return openDialog((close) => el('div', { class: 'dialog-body' }, [
     el('h2', { class: 'dialog-title', text: title }),
     text ? el('p', { class: 'muted', text }) : null,
     el('div', { class: 'dialog-actions' }, [
-      el('button', { type: 'button', class: 'btn', text: 'Zrušit', onclick: () => close(false) }),
+      el('button', { type: 'button', class: 'btn', text: t('Zrušit'), onclick: () => close(false) }),
       el('button', { type: 'button', class: `btn ${danger ? 'btn-danger' : 'btn-primary'}`, text: okLabel, onclick: () => close(true) }),
     ]),
   ]));
@@ -230,11 +232,11 @@ export function toast(text) {
   host._timer = setTimeout(() => host.classList.remove('is-visible'), 2200);
 }
 
-const kgFormat = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2 });
+const kgFormat = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 });
 
 export function formatWeight(kg, { bodyweight = false } = {}) {
   if (bodyweight) {
-    if (kg === 0) return 'tělo';
+    if (kg === 0) return t('tělo');
     return `${kg > 0 ? '+' : '−'}${kgFormat.format(Math.abs(kg))} kg`;
   }
   return `${kgFormat.format(kg)} kg`;
@@ -251,9 +253,9 @@ export function formatValues(entry, values) {
   return values.map((v) => `${w(v)} × ${v.reps}`).join(' | ');
 }
 
-export const dateShort = new Intl.DateTimeFormat('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' });
-export const dateLong = new Intl.DateTimeFormat('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-export const timeShort = new Intl.DateTimeFormat('cs-CZ', { hour: 'numeric', minute: '2-digit' });
+export const dateShort = new Intl.DateTimeFormat(locale, { weekday: 'short', day: 'numeric', month: 'numeric' });
+export const dateLong = new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+export const timeShort = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' });
 
 export function formatRest(seconds) {
   if (seconds % 60 === 0) return `${seconds / 60} min`;
@@ -264,4 +266,9 @@ export function formatBytes(bytes) {
   if (bytes == null) return '–';
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} kB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+// Text pro vyhledávání: malá písmena bez diakritiky
+export function normalize(text) {
+  return String(text ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }

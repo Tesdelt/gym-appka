@@ -1,4 +1,4 @@
-// Nastavení: vzhled, typy tréninků, posilovny, záloha dat, kontrola instalace.
+// Nastavení: vzhled, jazyk, typy tréninků, posilovny, záloha dat, kontrola instalace.
 
 import {
   listGyms, addGym, renameGym, deleteGym, listTemplates, addTemplate, reorderTemplates, colorAttrs,
@@ -8,19 +8,22 @@ import { navigate } from '../router.js';
 import { renderDiagnostics } from '../diagnostics.js';
 import { getTheme, setTheme } from '../theme.js';
 import { shareBackup, pickBackupFile, inspectBackup, importData } from '../backup.js';
+import { t, lang, setLang } from '../i18n.js';
 
-export const title = 'Nastavení';
+export const title = t('Nastavení');
 
 export function render(container) {
   const wrap = el('div', { class: 'stack' });
   container.append(wrap);
 
   const themeCard = el('section', { class: 'card' });
+  const langCard = el('section', { class: 'card' });
   const templatesCard = el('section', { class: 'card' });
   const gymsCard = el('section', { class: 'card' });
   const backupCard = el('section', { class: 'card' });
-  wrap.append(themeCard, templatesCard, gymsCard, backupCard);
+  wrap.append(themeCard, langCard, templatesCard, gymsCard, backupCard);
   renderTheme(themeCard);
+  renderLang(langCard);
   renderTemplates(templatesCard);
   renderGyms(gymsCard);
   renderBackup(backupCard);
@@ -31,10 +34,21 @@ export function render(container) {
 function renderTheme(card) {
   const current = getTheme();
   card.replaceChildren(
-    el('h2', { class: 'card-title', text: 'Vzhled' }),
-    el('div', { class: 'segmented' }, [['dark', 'Tmavý'], ['light', 'Světlý']].map(([key, label]) => el('button', {
+    el('h2', { class: 'card-title', text: t('Vzhled') }),
+    el('div', { class: 'segmented' }, [['dark', t('Tmavý')], ['light', t('Světlý')]].map(([key, label]) => el('button', {
       type: 'button', class: `seg ${current === key ? 'is-selected' : ''}`, text: label,
       onclick: () => { setTheme(key); renderTheme(card); },
+    }))),
+  );
+}
+
+// ---------- Jazyk ----------
+function renderLang(card) {
+  card.replaceChildren(
+    el('h2', { class: 'card-title', text: 'Jazyk / Language' }),
+    el('div', { class: 'segmented' }, [['cs', 'Čeština'], ['en', 'English']].map(([key, label]) => el('button', {
+      type: 'button', class: `seg ${lang === key ? 'is-selected' : ''}`, text: label,
+      onclick: () => { if (key !== lang) setLang(key); },
     }))),
   );
 }
@@ -42,13 +56,13 @@ function renderTheme(card) {
 // ---------- Typy tréninků ----------
 async function renderTemplates(card) {
   const templates = await listTemplates();
-  const list = el('ul', { class: 'list drag-list' }, templates.map((t, i) => el('li', { ...colorAttrs(t.color, 'list-row'), 'data-index': i }, [
+  const list = el('ul', { class: 'list drag-list' }, templates.map((tpl, i) => el('li', { ...colorAttrs(tpl.color, 'list-row'), 'data-index': i }, [
     dragHandle(),
-    el('button', { type: 'button', class: 'list-main', onclick: () => navigate(`sablona/${encodeURIComponent(t.id)}`) }, [
-      el('span', { class: 'block', text: `${i + 1}. ${t.name}` }),
+    el('button', { type: 'button', class: 'list-main', onclick: () => navigate(`sablona/${encodeURIComponent(tpl.id)}`) }, [
+      el('span', { class: 'block', text: `${i + 1}. ${tpl.name}` }),
       el('span', { class: 'muted small block', text: [
-        t.subtitle,
-        t.exercises.length ? plural(t.exercises.length, ['cvik', 'cviky', 'cviků']) : 'bez cviků',
+        tpl.subtitle,
+        tpl.exercises.length ? plural(tpl.exercises.length, ['cvik', 'cviky', 'cviků'], ['exercise', 'exercises']) : t('bez cviků'),
       ].filter(Boolean).join(' · ') }),
     ]),
     el('span', { class: 'chevron', 'aria-hidden': 'true', text: '›' }),
@@ -58,15 +72,15 @@ async function renderTemplates(card) {
     renderTemplates(card);
   });
   card.replaceChildren(
-    el('h2', { class: 'card-title', text: 'Typy tréninků' }),
+    el('h2', { class: 'card-title', text: t('Typy tréninků') }),
     list,
     el('button', {
-      type: 'button', class: 'btn', text: '+ Přidat typ tréninku',
+      type: 'button', class: 'btn', text: t('+ Přidat typ tréninku'),
       onclick: async () => {
-        const name = await promptText({ title: 'Nový typ tréninku', placeholder: 'např. Nohy', okLabel: 'Přidat' });
+        const name = await promptText({ title: t('Nový typ tréninku'), placeholder: t('např. Nohy'), okLabel: t('Přidat') });
         if (!name) return;
-        const t = await addTemplate(name);
-        navigate(`sablona/${encodeURIComponent(t.id)}`);
+        const tpl = await addTemplate(name);
+        navigate(`sablona/${encodeURIComponent(tpl.id)}`);
       },
     }),
   );
@@ -76,34 +90,34 @@ async function renderTemplates(card) {
 async function renderGyms(card) {
   const gyms = await listGyms();
   card.replaceChildren(
-    el('h2', { class: 'card-title', text: 'Posilovny' }),
+    el('h2', { class: 'card-title', text: t('Posilovny') }),
     el('ul', { class: 'list' }, gyms.map((gym) => el('li', { class: 'list-row' }, [
       el('button', {
         type: 'button', class: 'list-main', text: gym.name,
         onclick: async () => {
-          const name = await promptText({ title: 'Přejmenovat posilovnu', value: gym.name });
+          const name = await promptText({ title: t('Přejmenovat posilovnu'), value: gym.name });
           if (name && name !== gym.name) { await renameGym(gym.id, name); renderGyms(card); }
         },
       }),
       el('button', {
-        type: 'button', class: 'btn btn-small btn-icon', 'aria-label': `Smazat ${gym.name}`, html: '&times;',
+        type: 'button', class: 'btn btn-small btn-icon', 'aria-label': t('Smazat {name}', { name: gym.name }), html: '&times;',
         disabled: gyms.length <= 1 ? '' : null,
         onclick: async () => {
           const ok = await confirmDialog({
-            title: `Smazat „${gym.name}“?`,
-            text: 'Záznamy tréninků z této posilovny zůstanou, ale kladkové hodnoty pro ni už nepůjde vybrat.',
-            okLabel: 'Smazat', danger: true,
+            title: t('Smazat „{name}“?', { name: gym.name }),
+            text: t('Záznamy tréninků z této posilovny zůstanou, ale kladkové hodnoty pro ni už nepůjde vybrat.'),
+            okLabel: t('Smazat'), danger: true,
           });
-          if (ok) { await deleteGym(gym.id); toast('Posilovna smazána'); renderGyms(card); }
+          if (ok) { await deleteGym(gym.id); toast(t('Posilovna smazána')); renderGyms(card); }
         },
       }),
     ]))),
-    el('p', { class: 'muted small', text: 'Klepnutím na název posilovnu přejmenuješ.' }),
+    el('p', { class: 'muted small', text: t('Klepnutím na název posilovnu přejmenuješ.') }),
     el('button', {
-      type: 'button', class: 'btn', text: '+ Přidat posilovnu',
+      type: 'button', class: 'btn', text: t('+ Přidat posilovnu'),
       onclick: async () => {
-        const name = await promptText({ title: 'Nová posilovna', placeholder: 'Název', okLabel: 'Přidat' });
-        if (name) { await addGym(name); toast('Posilovna přidána'); renderGyms(card); }
+        const name = await promptText({ title: t('Nová posilovna'), placeholder: t('Název'), okLabel: t('Přidat') });
+        if (name) { await addGym(name); toast(t('Posilovna přidána')); renderGyms(card); }
       },
     }),
   );
@@ -112,27 +126,27 @@ async function renderGyms(card) {
 // ---------- Záloha ----------
 function renderBackup(card) {
   card.replaceChildren(
-    el('h2', { class: 'card-title', text: 'Záloha dat' }),
-    el('p', { class: 'muted small', text: 'Export uloží všechna data včetně vlastních fotek do souboru. Na iPhonu zvol „Uložit do Souborů“.' }),
+    el('h2', { class: 'card-title', text: t('Záloha dat') }),
+    el('p', { class: 'muted small', text: t('Export uloží všechna data včetně vlastních fotek do souboru. Na iPhonu zvol „Uložit do Souborů“.') }),
     el('div', { class: 'row-2' }, [
       el('button', {
-        type: 'button', class: 'btn btn-primary', text: 'Exportovat',
+        type: 'button', class: 'btn btn-primary', text: t('Exportovat'),
         onclick: async (e) => {
           const btn = e.currentTarget;
           btn.disabled = true;
           try {
             const result = await shareBackup();
-            if (result === 'downloaded') toast('Záloha stažena');
+            if (result === 'downloaded') toast(t('Záloha stažena'));
           } catch (err) {
             console.error(err);
-            toast('Export selhal');
+            toast(t('Export selhal'));
           } finally {
             btn.disabled = false;
           }
         },
       }),
       el('button', {
-        type: 'button', class: 'btn', text: 'Importovat',
+        type: 'button', class: 'btn', text: t('Importovat'),
         onclick: async () => {
           const data = await pickBackupFile();
           if (!data) return;
@@ -140,18 +154,23 @@ function renderBackup(card) {
           let info;
           try { info = inspectBackup(data); } catch (err) { toast(err.message); return; }
           const ok = await confirmDialog({
-            title: 'Přepsat současná data?',
-            text: `Záloha z ${info.exportedAt ? dateShort.format(new Date(info.exportedAt)) : '?'}: ${plural(info.workouts, ['trénink', 'tréninky', 'tréninků'])}, ${plural(info.exercises, ['cvik', 'cviky', 'cviků'])}, ${plural(info.photos, ['obrázek', 'obrázky', 'obrázků'])}. Všechna data v appce se nahradí obsahem zálohy.`,
-            okLabel: 'Přepsat', danger: true,
+            title: t('Přepsat současná data?'),
+            text: t('Záloha z {date}: {workouts}, {exercises}, {photos}. Všechna data v appce se nahradí obsahem zálohy.', {
+              date: info.exportedAt ? dateShort.format(new Date(info.exportedAt)) : '?',
+              workouts: plural(info.workouts, ['trénink', 'tréninky', 'tréninků'], ['workout', 'workouts']),
+              exercises: plural(info.exercises, ['cvik', 'cviky', 'cviků'], ['exercise', 'exercises']),
+              photos: plural(info.photos, ['obrázek', 'obrázky', 'obrázků'], ['image', 'images']),
+            }),
+            okLabel: t('Přepsat'), danger: true,
           });
           if (!ok) return;
           try {
             await importData(data);
-            toast('Data obnovena');
+            toast(t('Data obnovena'));
             setTimeout(() => { location.hash = '#/domu'; location.reload(); }, 600);
           } catch (err) {
             console.error(err);
-            toast('Import selhal, data zůstala beze změny');
+            toast(t('Import selhal, data zůstala beze změny'));
           }
         },
       }),

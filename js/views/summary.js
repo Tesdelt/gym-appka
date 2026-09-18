@@ -13,11 +13,12 @@ import {
   getActiveWorkout, getWorkout, listDoneWorkouts, finishWorkout, saveWorkout, deleteWorkout,
   elapsedSeconds, formatDurationLong, compareWithPrevious, slotLabel,
 } from '../workout.js';
+import { t, exName } from '../i18n.js';
 
-export const title = 'Souhrn';
+export const title = t('Souhrn');
 export const tab = 'domu';
 
-const SCALES = [['energy', 'Energie'], ['sleep', 'Spánek'], ['food', 'Jídlo']];
+const SCALES = [['energy', t('Energie')], ['sleep', t('Spánek')], ['food', t('Jídlo')]];
 
 export async function render(container, { params }) {
   const id = params[0];
@@ -33,8 +34,8 @@ export async function render(container, { params }) {
 async function drawSummary(container, workout, id, state, redraw) {
   if (!workout) {
     container.append(el('section', { class: 'card' }, [
-      el('h2', { class: 'card-title', text: id ? 'Trénink nenalezen' : 'Žádný rozdělaný trénink' }),
-      el('button', { type: 'button', class: 'btn btn-primary', text: 'Na Domů', onclick: () => navigate('domu') }),
+      el('h2', { class: 'card-title', text: id ? t('Trénink nenalezen') : t('Žádný rozdělaný trénink') }),
+      el('button', { type: 'button', class: 'btn btn-primary', text: t('Na Domů'), onclick: () => navigate('domu') }),
     ]));
     return;
   }
@@ -48,6 +49,7 @@ async function drawSummary(container, workout, id, state, redraw) {
   const recordSlots = new Set(records.map((r) => r.slot));
   const comparison = compareWithPrevious(workout, previousSame);
   const started = new Date(workout.startedAt);
+  const nameOf = (entry) => exName(exMap.get(entry.exerciseId), entry.name);
 
   const stack = el('div', { class: 'stack' });
   container.append(stack);
@@ -57,21 +59,21 @@ async function drawSummary(container, workout, id, state, redraw) {
   stack.append(el('section', colorAttrs(tmpl?.color, 'card'), [
     el('h2', { class: 'ex-name', text: workout.name }),
     el('dl', { class: 'kv' }, [
-      kv('Datum', `${dateLong.format(started)}, ${timeShort.format(started)}`),
-      kv('Posilovna', workout.gymName),
-      kv('Délka', formatDurationLong(elapsedSeconds(workout))),
-      kv('Série', `${workout.exercises.reduce((a, e) => a + slotsOf(e).filter((s) => s.done).length, 0)} hotových`),
+      kv(t('Datum'), `${dateLong.format(started)}, ${timeShort.format(started)}`),
+      kv(t('Posilovna'), workout.gymName),
+      kv(t('Délka'), formatDurationLong(elapsedSeconds(workout))),
+      kv(t('Série'), t('{n} hotových', { n: workout.exercises.reduce((a, e) => a + slotsOf(e).filter((s) => s.done).length, 0) })),
     ]),
   ]));
 
   // Rekordy
   if (records.length) {
     stack.append(el('section', { class: 'card card-gold' }, [
-      el('h2', { class: 'card-title gold', text: 'Nové osobní rekordy' }),
+      el('h2', { class: 'card-title gold', text: t('Nové osobní rekordy') }),
       el('ul', { class: 'plain-list' }, records.map((r) => {
         const entry = workout.exercises.find((e) => e.uid === r.entryUid);
         return el('li', {}, [
-          el('strong', { text: entry.name }),
+          el('strong', { text: nameOf(entry) }),
           el('span', { class: 'muted', text: ` – ${r.text}: ${formatValues(entry, [r.slot])}` }),
         ]);
       })),
@@ -88,17 +90,17 @@ async function drawSummary(container, workout, id, state, redraw) {
       if (!workout.exercises.some((e) => e.exerciseId === g.exerciseId)) continue;
       const before = evaluateGoal(g, previousAll);
       const after = evaluateGoal(g, [asDone, ...previousAll]);
-      const name = exercises.get(g.exerciseId)?.name ?? '';
-      if (after.reached) rows.push(el('li', { class: 'gold' }, [el('strong', { text: name }), el('span', { text: ' – cíl splněn!' })]));
+      const name = exName(exercises.get(g.exerciseId));
+      if (after.reached) rows.push(el('li', { class: 'gold' }, [el('strong', { text: name }), el('span', { text: t(' – cíl splněn!') })]));
       else if (after.progress > before.progress) {
-        rows.push(el('li', {}, [el('strong', { text: name }), el('span', { class: 'muted', text: ` – cíl posunut ${Math.round(before.progress * 100)} % → ${Math.round(after.progress * 100)} %` })]));
+        rows.push(el('li', {}, [el('strong', { text: name }), el('span', { class: 'muted', text: t(' – cíl posunut {from} % → {to} %', { from: Math.round(before.progress * 100), to: Math.round(after.progress * 100) }) })]));
       } else {
-        rows.push(el('li', {}, [el('strong', { text: name }), el('span', { class: 'muted', text: ` – cíl beze změny (${Math.round(after.progress * 100)} %)` })]));
+        rows.push(el('li', {}, [el('strong', { text: name }), el('span', { class: 'muted', text: t(' – cíl beze změny ({n} %)', { n: Math.round(after.progress * 100) }) })]));
       }
     }
     if (rows.length) {
       stack.append(el('section', { class: `card ${rows.some((r) => r.classList.contains('gold')) ? 'card-gold' : ''}` }, [
-        el('h2', { class: 'card-title', text: 'Cíle' }),
+        el('h2', { class: 'card-title', text: t('Cíle') }),
         el('ul', { class: 'plain-list' }, rows),
       ]));
     }
@@ -107,30 +109,30 @@ async function drawSummary(container, workout, id, state, redraw) {
   // Porovnání
   if (comparison.length) {
     stack.append(el('section', { class: 'card' }, [
-      el('h2', { class: 'card-title', text: 'Oproti minulému tréninku' }),
+      el('h2', { class: 'card-title', text: t('Oproti minulému tréninku') }),
       el('ul', { class: 'plain-list' }, comparison.map((c) => el('li', { class: `cmp cmp-${c.verdict}` }, [
         el('span', { class: 'cmp-mark', text: c.verdict === 'up' ? '↑' : c.verdict === 'down' ? '↓' : '=' }),
         el('span', {}, [
-          el('strong', { class: 'block', text: c.entry.name }),
+          el('strong', { class: 'block', text: nameOf(c.entry) }),
           el('span', { class: 'muted small', text: `${formatValues(c.entry, c.before)} → ${formatValues(c.entry, c.now)}` }),
         ]),
       ]))),
     ]));
   } else if (!previousSame) {
-    stack.append(el('p', { class: 'muted small', text: 'První trénink tohoto typu, není s čím porovnat.' }));
+    stack.append(el('p', { class: 'muted small', text: t('První trénink tohoto typu, není s čím porovnat.') }));
   }
 
   // Cviky a série
   stack.append(el('section', { class: 'card' }, [
-    el('h2', { class: 'card-title', text: 'Cviky' }),
+    el('h2', { class: 'card-title', text: t('Cviky') }),
     ...workout.exercises.map((entry) => {
       const slots = slotsOf(entry);
       const doneSlots = slots.map((s, i) => [s, i]).filter(([s]) => s.done);
       return el('div', { class: 'sum-ex' }, [
-        el('strong', { class: 'block', text: entry.name }),
+        el('strong', { class: 'block', text: nameOf(entry) }),
         doneSlots.length || state.editing
           ? el('ul', { class: 'plain-list sum-sets' }, (state.editing ? slots.map((s, i) => [s, i]) : doneSlots).map(([s, i]) => {
-            const text = ` ${s.done ? formatValues(entry, [s]) : 'neodcvičeno'}${recordSlots.has(s) ? ' ★' : ''}`;
+            const text = ` ${s.done ? formatValues(entry, [s]) : t('neodcvičeno')}${recordSlots.has(s) ? ' ★' : ''}`;
             if (!state.editing) {
               return el('li', { class: recordSlots.has(s) ? 'gold' : '' }, [
                 el('span', { class: 'muted small', text: slotLabel(entry, i) }),
@@ -142,27 +144,27 @@ async function drawSummary(container, workout, id, state, redraw) {
               onclick: async () => { if (await editSlot(entry, s)) redraw(); },
             }, [el('span', { class: 'muted small', text: `${slotLabel(entry, i)} ✎` }), el('span', { text })])]);
           }))
-          : el('span', { class: 'muted small block', text: entry.skipped ? 'Přeskočeno' : 'Neodcvičeno' }),
+          : el('span', { class: 'muted small block', text: entry.skipped ? t('Přeskočeno') : t('Neodcvičeno') }),
         state.editing
           ? el('button', {
-            type: 'button', class: 'btn btn-small', text: entry.note ? `Poznámka: ${entry.note}` : 'Přidat poznámku',
+            type: 'button', class: 'btn btn-small', text: entry.note ? t('Poznámka: {note}', { note: entry.note }) : t('Přidat poznámku'),
             onclick: async () => {
-              const text = await promptText({ title: 'Poznámka k cviku', value: entry.note ?? '' });
+              const text = await promptText({ title: t('Poznámka k cviku'), value: entry.note ?? '' });
               if (text != null) { entry.note = text; redraw(); }
             },
           })
-          : entry.note ? el('span', { class: 'small block', text: `Poznámka: ${entry.note}` }) : null,
-        entry.next && entry.next !== 'keep' ? el('span', { class: 'muted small block', text: `Na příště: ${{ more: 'přidat', less: 'snížit' }[entry.next]}` }) : null,
+          : entry.note ? el('span', { class: 'small block', text: t('Poznámka: {note}', { note: entry.note }) }) : null,
+        entry.next && entry.next !== 'keep' ? el('span', { class: 'muted small block', text: t('Na příště: {what}', { what: { more: t('přidat'), less: t('snížit') }[entry.next] }) }) : null,
       ]);
     }),
   ]));
 
   // Škály a komentář
   const scales = { ...workout.scales };
-  const comment = el('textarea', { class: 'input textarea', rows: 3, placeholder: 'Komentář (např. „unavený už předem“)', disabled: editable ? null : '' });
+  const comment = el('textarea', { class: 'input textarea', rows: 3, placeholder: t('Komentář (např. „unavený už předem“)'), disabled: editable ? null : '' });
   comment.value = workout.comment ?? '';
   stack.append(el('section', { class: 'card' }, [
-    el('h2', { class: 'card-title', text: 'Jak to šlo' }),
+    el('h2', { class: 'card-title', text: t('Jak to šlo') }),
     ...SCALES.map(([key, label]) => el('div', { class: 'scale-row' }, [
       el('span', { class: 'scale-label', text: label }),
       el('div', { class: 'segmented' }, [1, 2, 3, 4, 5].map((n) => el('button', {
@@ -187,24 +189,24 @@ async function drawSummary(container, workout, id, state, redraw) {
     stack.append(el('div', { class: 'stack' }, [
       el('button', {
         type: 'button', class: 'btn btn-primary btn-hero',
-        text: 'Uložit trénink',
+        text: t('Uložit trénink'),
         onclick: async () => {
           await finishWorkout(workout, { scales, comment: comment.value.trim() });
           const [goals, all, measurements] = await Promise.all([listGoals(), listDoneWorkouts(), listMeasurements()]);
           const reached = await markReachedGoals(goals, all, measurements);
-          toast(reached.length ? 'Trénink uložen, cíl splněn!' : 'Trénink uložen');
+          toast(reached.length ? t('Trénink uložen, cíl splněn!') : t('Trénink uložen'));
           navigate('domu');
         },
       }),
       el('button', {
-        type: 'button', class: 'btn', text: 'Zpět do tréninku',
+        type: 'button', class: 'btn', text: t('Zpět do tréninku'),
         onclick: async () => { workout.endedAt = null; await saveWorkout(workout); navigate('trenink'); },
       }),
     ]));
   } else if (state.editing) {
     stack.append(el('div', { class: 'row-2' }, [
       el('button', {
-        type: 'button', class: 'btn', text: 'Zrušit',
+        type: 'button', class: 'btn', text: t('Zrušit'),
         onclick: async () => {
           Object.assign(workout, await getWorkout(workout.id)); // zahodit neuložené úpravy
           state.editing = false;
@@ -212,13 +214,13 @@ async function drawSummary(container, workout, id, state, redraw) {
         },
       }),
       el('button', {
-        type: 'button', class: 'btn btn-primary', text: 'Uložit změny',
+        type: 'button', class: 'btn btn-primary', text: t('Uložit změny'),
         onclick: async () => {
           workout.scales = scales;
           workout.comment = comment.value.trim();
           await saveWorkout(workout);
           state.editing = false;
-          toast('Změny uloženy');
+          toast(t('Změny uloženy'));
           await redraw();
         },
       }),
@@ -226,14 +228,14 @@ async function drawSummary(container, workout, id, state, redraw) {
   } else {
     stack.append(el('div', { class: 'row-2' }, [
       el('button', {
-        type: 'button', class: 'btn', text: 'Upravit',
+        type: 'button', class: 'btn', text: t('Upravit'),
         onclick: async () => { state.editing = true; await redraw(); },
       }),
       el('button', {
-        type: 'button', class: 'btn btn-danger', text: 'Smazat trénink',
+        type: 'button', class: 'btn btn-danger', text: t('Smazat trénink'),
         onclick: async () => {
-          const ok = await confirmDialog({ title: 'Smazat tento trénink?', text: 'Záznam zmizí z historie i ze statistik.', okLabel: 'Smazat', danger: true });
-          if (ok) { await deleteWorkout(workout.id); toast('Trénink smazán'); navigate('domu'); }
+          const ok = await confirmDialog({ title: t('Smazat tento trénink?'), text: t('Záznam zmizí z historie i ze statistik.'), okLabel: t('Smazat'), danger: true });
+          if (ok) { await deleteWorkout(workout.id); toast(t('Trénink smazán')); navigate('domu'); }
         },
       }),
     ]));
@@ -249,21 +251,21 @@ function kv(label, value) {
 function editSlot(entry, slot) {
   return openDialog((close) => {
     const field = stepField;
-    const weight = entry.type === 'reps' ? null : field(entry.bodyweight ? 'Přidaná váha (kg)' : 'Váha (kg)', slot.weight, entry.weightStep ?? 2.5, entry.bodyweight ? null : 0);
-    const reps = entry.type === 'time' ? null : field('Opakování', slot.reps, 1, 0);
-    const seconds = entry.type === 'time' ? field('Výdrž (s)', slot.seconds, 5, 0) : null;
+    const weight = entry.type === 'reps' ? null : field(entry.bodyweight ? t('Přidaná váha (kg)') : t('Váha (kg)'), slot.weight, entry.weightStep ?? 2.5, entry.bodyweight ? null : 0);
+    const reps = entry.type === 'time' ? null : field(t('Opakování'), slot.reps, 1, 0);
+    const seconds = entry.type === 'time' ? field(t('Výdrž (s)'), slot.seconds, 5, 0) : null;
     let done = slot.done;
     const doneBtn = el('button', {
-      type: 'button', class: `btn btn-small ${done ? 'btn-primary' : ''}`, text: done ? 'Odcvičeno' : 'Neodcvičeno',
-      onclick: () => { done = !done; doneBtn.textContent = done ? 'Odcvičeno' : 'Neodcvičeno'; doneBtn.classList.toggle('btn-primary', done); },
+      type: 'button', class: `btn btn-small ${done ? 'btn-primary' : ''}`, text: done ? t('Odcvičeno') : t('Neodcvičeno'),
+      onclick: () => { done = !done; doneBtn.textContent = done ? t('Odcvičeno') : t('Neodcvičeno'); doneBtn.classList.toggle('btn-primary', done); },
     });
     const form = el('form', { method: 'dialog', class: 'dialog-body' }, [
-      el('h2', { class: 'dialog-title', text: 'Upravit sérii' }),
+      el('h2', { class: 'dialog-title', text: t('Upravit sérii') }),
       weight?.root, reps?.root, seconds?.root,
-      el('div', { class: 'note-next' }, [el('span', { class: 'muted small', text: 'Stav' }), doneBtn]),
+      el('div', { class: 'note-next' }, [el('span', { class: 'muted small', text: t('Stav') }), doneBtn]),
       el('div', { class: 'dialog-actions' }, [
-        el('button', { type: 'button', class: 'btn', text: 'Zrušit', onclick: () => close(false) }),
-        el('button', { type: 'submit', class: 'btn btn-primary', text: 'Použít' }),
+        el('button', { type: 'button', class: 'btn', text: t('Zrušit'), onclick: () => close(false) }),
+        el('button', { type: 'submit', class: 'btn btn-primary', text: t('Použít') }),
       ]),
     ]);
     form.addEventListener('submit', (e) => {

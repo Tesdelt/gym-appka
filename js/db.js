@@ -5,6 +5,7 @@
 // Data uživatele se nikdy nemažou, jen se doplňují nové sklady a indexy.
 
 import { BUILTIN_IMAGES } from './builtinImages.js';
+import { t } from './i18n.js';
 
 const DB_NAME = 'gym';
 
@@ -59,7 +60,7 @@ export function openDB() {
       resolve(db);
     };
     req.onerror = () => reject(req.error);
-    req.onblocked = () => reject(new Error('Databáze je blokovaná jiným oknem appky.'));
+    req.onblocked = () => reject(new Error(t('Databáze je blokovaná jiným oknem appky.')));
   });
   return dbPromise;
 }
@@ -75,7 +76,7 @@ function done(tx) {
   return new Promise((resolve, reject) => {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error || new Error('Transakce zrušena'));
+    tx.onabort = () => reject(tx.error || new Error(t('Transakce zrušena')));
   });
 }
 

@@ -8,7 +8,7 @@ import { el, openDialog, confirmDialog, toast, stepField, formatWeight, formatVa
 import { navigate } from '../router.js';
 import {
   listMeasureKinds, saveMeasureKinds, listMeasurements, addMeasurement, deleteMeasurement,
-  exerciseMap, listGyms, getLastGymId,
+  exerciseMap, listGyms, getLastGymId, kindName,
 } from '../data.js';
 import { listDoneWorkouts } from '../workout.js';
 import { computeRecords, recordKey } from '../records.js';
@@ -19,8 +19,9 @@ import {
 } from '../stats.js';
 import { recordText } from './exercise.js';
 import { countUp } from '../fx.js';
+import { t, lang, locale, exName } from '../i18n.js';
 
-export const title = 'Statistiky';
+export const title = t('Statistiky');
 
 export async function render(container, { params, extraEl, titleEl }) {
   if (params[0] === 'mira' && params[1]) {
@@ -36,12 +37,12 @@ export async function render(container, { params, extraEl, titleEl }) {
 
 function backButton() {
   return el('button', {
-    type: 'button', class: 'btn btn-small', text: '← Zpět',
+    type: 'button', class: 'btn btn-small', text: t('← Zpět'),
     onclick: () => (history.length > 1 ? history.back() : navigate('statistiky')),
   });
 }
 
-const num = (v, digits = 2) => new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: digits }).format(v);
+const num = (v, digits = 2) => new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(v);
 const today = () => new Date().toISOString().slice(0, 10);
 const parse = (input) => parseFloat(String(input.value).replace(',', '.').replace(/\s/g, ''));
 const toIso = (dateStr) => {
@@ -60,15 +61,15 @@ async function renderOverview(container) {
 
   // Frekvence
   const f = frequency(done);
-  const monthFmt = new Intl.DateTimeFormat('cs-CZ', { day: 'numeric', month: 'numeric' });
+  const monthFmt = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'numeric' });
   stack.append(el('section', { class: 'card' }, [
-    el('h2', { class: 'card-title', text: 'Frekvence tréninků' }),
+    el('h2', { class: 'card-title', text: t('Frekvence tréninků') }),
     el('div', { class: 'stat-tiles' }, [
-      tile('Tento týden', String(f.week)),
-      tile('Tento měsíc', String(f.month)),
-      tile('Průměr / týden', num(f.avg, 1)),
+      tile(t('Tento týden'), String(f.week)),
+      tile(t('Tento měsíc'), String(f.month)),
+      tile(t('Průměr / týden'), num(f.avg, 1)),
     ]),
-    el('h4', { class: 'sub-title', text: 'Posledních 12 týdnů' }),
+    el('h4', { class: 'sub-title', text: t('Posledních 12 týdnů') }),
     barChart(f.buckets.map((b, i) => ({ value: b.count, current: i === f.buckets.length - 1, from: b.from })), {
       label: (b, i) => (i % 3 === 0 || i === 11 ? monthFmt.format(b.from) : ''),
     }),
@@ -79,7 +80,7 @@ async function renderOverview(container) {
     const last = measurements.find((m) => m.kind === k.key);
     return el('li', { class: 'list-row' }, [
       el('button', { type: 'button', class: 'list-main stat-row', onclick: () => navigate(`statistiky/mira/${encodeURIComponent(k.key)}`) }, [
-        el('span', { text: k.name }),
+        el('span', { text: kindName(k) }),
         el('span', { class: 'stat-value' }, [
           el('strong', { text: last ? `${num(last.value)} ${k.unit}` : '–' }),
           last ? el('span', { class: 'muted small block', text: dateShort.format(new Date(last.date)) }) : null,
@@ -88,11 +89,11 @@ async function renderOverview(container) {
     ]);
   });
   stack.append(el('section', { class: 'card' }, [
-    el('h2', { class: 'card-title', text: 'Tělesné míry' }),
+    el('h2', { class: 'card-title', text: t('Tělesné míry') }),
     el('ul', { class: 'list' }, bodyRows),
     el('div', { class: 'row-2' }, [
-      el('button', { type: 'button', class: 'btn btn-primary', text: '+ Zapsat', onclick: async () => { if (await addMeasureDialog(kinds)) rerender(); } }),
-      el('button', { type: 'button', class: 'btn', text: '+ Nová míra', onclick: async () => { if (await newKindDialog(kinds)) rerender(); } }),
+      el('button', { type: 'button', class: 'btn btn-primary', text: t('+ Zapsat'), onclick: async () => { if (await addMeasureDialog(kinds)) rerender(); } }),
+      el('button', { type: 'button', class: 'btn', text: t('+ Nová míra'), onclick: async () => { if (await newKindDialog(kinds)) rerender(); } }),
     ]),
   ]));
 
@@ -100,7 +101,7 @@ async function renderOverview(container) {
   const sessions = [...done, ...manualAsWorkouts(manual, exercises)];
   const records = computeRecords(sessions);
   const rows = [];
-  const sorted = [...exercises.values()].sort((a, b) => a.name.localeCompare(b.name, 'cs'));
+  const sorted = [...exercises.values()].sort((a, b) => exName(a).localeCompare(exName(b), lang));
   for (const ex of sorted) {
     const keys = ex.perGym ? gyms.map((g) => ({ gym: g, key: recordKey({ exerciseId: ex.id, perGym: true }, g.id) })) : [{ gym: null, key: ex.id }];
     for (const { gym, key } of keys) {
@@ -109,20 +110,20 @@ async function renderOverview(container) {
       if (text === '–') continue;
       rows.push(el('li', { class: 'list-row' }, [
         el('button', { type: 'button', class: 'list-main stat-row', onclick: () => navigate(`statistiky/cvik/${encodeURIComponent(ex.id)}`) }, [
-          el('span', {}, [el('span', { class: 'block', text: ex.name }), gym && gyms.length > 1 ? el('span', { class: 'muted small block', text: gym.name }) : null]),
+          el('span', {}, [el('span', { class: 'block', text: exName(ex) }), gym && gyms.length > 1 ? el('span', { class: 'muted small block', text: gym.name }) : null]),
           el('strong', { class: 'gold stat-value', text: text }),
         ]),
       ]));
     }
   }
   stack.append(el('section', { class: 'card' }, [
-    el('h2', { class: 'card-title', text: 'Osobní rekordy' }),
-    rows.length ? el('ul', { class: 'list' }, rows) : el('p', { class: 'muted small', text: 'Zatím žádné. Plní se z tréninků, nebo zapiš ruční záznam.' }),
+    el('h2', { class: 'card-title', text: t('Osobní rekordy') }),
+    rows.length ? el('ul', { class: 'list' }, rows) : el('p', { class: 'muted small', text: t('Zatím žádné. Plní se z tréninků, nebo zapiš ruční záznam.') }),
     el('button', {
-      type: 'button', class: 'btn', text: '+ Ruční záznam výkonu',
+      type: 'button', class: 'btn', text: t('+ Ruční záznam výkonu'),
       onclick: async () => {
         const { pickExercise } = await import('../exercisePicker.js');
-        const ex = await pickExercise({ title: 'Ruční záznam u cviku' });
+        const ex = await pickExercise({ title: t('Ruční záznam u cviku'), catalog: false });
         if (ex && await manualRecordDialog(ex, gyms, await getLastGymId())) rerender();
       },
     }),
@@ -137,7 +138,7 @@ async function renderOverview(container) {
 function tile(label, value) {
   const n = parseFloat(value.replace(',', '.'));
   const valueEl = el('span', { class: 'stat-tile-value', text: value });
-  const decimals = value.includes(',') ? 1 : 0;
+  const decimals = /[,.]/.test(value) ? 1 : 0;
   countUp(valueEl, n, (v) => num(decimals ? v : Math.round(v), decimals));
   return el('div', { class: 'stat-tile' }, [valueEl, el('span', { class: 'muted small', text: label })]);
 }
@@ -146,8 +147,8 @@ function tile(label, value) {
 async function renderMeasure(container, key, titleEl) {
   const [kinds, all] = await Promise.all([listMeasureKinds(), listMeasurements()]);
   const kind = kinds.find((k) => k.key === key);
-  if (!kind) { container.append(el('p', { class: 'muted', text: 'Míra nenalezena.' })); return; }
-  titleEl.textContent = kind.name;
+  if (!kind) { container.append(el('p', { class: 'muted', text: t('Míra nenalezena.') })); return; }
+  titleEl.textContent = kindName(kind);
   const entries = all.filter((m) => m.kind === key);
   const rerender = () => { container.replaceChildren(); renderMeasure(container, key, titleEl); };
 
@@ -159,10 +160,10 @@ async function renderMeasure(container, key, titleEl) {
         el('span', { class: 'muted', text: last ? `${kind.unit} · ${dateShort.format(new Date(last.date))}` : kind.unit }),
       ]),
       rangeChart(entries.map((m) => ({ t: m.date, v: m.value })), { format: (v) => num(v, 1) }),
-      el('button', { type: 'button', class: 'btn btn-primary', text: '+ Zapsat', onclick: async () => { if (await addMeasureDialog(kinds, key)) rerender(); } }),
+      el('button', { type: 'button', class: 'btn btn-primary', text: t('+ Zapsat'), onclick: async () => { if (await addMeasureDialog(kinds, key)) rerender(); } }),
     ]),
     el('section', { class: 'card' }, [
-      el('h3', { class: 'card-title', text: 'Záznamy' }),
+      el('h3', { class: 'card-title', text: t('Záznamy') }),
       entries.length
         ? el('ul', { class: 'list' }, entries.map((m) => el('li', { class: 'list-row' }, [
           el('span', { class: 'list-main stat-row' }, [
@@ -170,21 +171,21 @@ async function renderMeasure(container, key, titleEl) {
             el('strong', { text: `${num(m.value)} ${kind.unit}` }),
           ]),
           el('button', {
-            type: 'button', class: 'btn btn-small btn-icon', html: '&times;', 'aria-label': 'Smazat záznam',
+            type: 'button', class: 'btn btn-small btn-icon', html: '&times;', 'aria-label': t('Smazat záznam'),
             onclick: async () => {
-              if (await confirmDialog({ title: 'Smazat záznam?', okLabel: 'Smazat', danger: true })) { await deleteMeasurement(m.id); rerender(); }
+              if (await confirmDialog({ title: t('Smazat záznam?'), okLabel: t('Smazat'), danger: true })) { await deleteMeasurement(m.id); rerender(); }
             },
           }),
         ])))
-        : el('p', { class: 'muted small', text: 'Zatím žádný záznam.' }),
+        : el('p', { class: 'muted small', text: t('Zatím žádný záznam.') }),
     ]),
     el('button', {
-      type: 'button', class: 'btn btn-danger', text: 'Smazat míru',
+      type: 'button', class: 'btn btn-danger', text: t('Smazat míru'),
       onclick: async () => {
         const ok = await confirmDialog({
-          title: `Smazat míru „${kind.name}“?`,
-          text: entries.length ? `Smažou se i ${plural(entries.length, ['záznam', 'záznamy', 'záznamů'])}.` : '',
-          okLabel: 'Smazat', danger: true,
+          title: t('Smazat míru „{name}“?', { name: kindName(kind) }),
+          text: entries.length ? t('Smažou se i {n}.', { n: plural(entries.length, ['záznam', 'záznamy', 'záznamů'], ['entry', 'entries']) }) : '',
+          okLabel: t('Smazat'), danger: true,
         });
         if (!ok) return;
         for (const m of entries) await deleteMeasurement(m.id);
@@ -199,26 +200,26 @@ function addMeasureDialog(kinds, presetKey = null) {
   return openDialog((close) => {
     let key = presetKey ?? kinds[0]?.key;
     const kindSelect = presetKey ? null : el('select', { class: 'input', onchange: (e) => { key = e.target.value; } },
-      kinds.map((k) => el('option', { value: k.key, text: `${k.name} (${k.unit})` })));
+      kinds.map((k) => el('option', { value: k.key, text: `${kindName(k)} (${k.unit})` })));
     const value = el('input', { type: 'text', class: 'input input-number', inputmode: 'decimal', autocomplete: 'off' });
     const date = el('input', { type: 'date', class: 'input', value: today(), max: today() });
     const kind = kinds.find((k) => k.key === key);
     const form = el('form', { method: 'dialog', class: 'dialog-body stack-tight' }, [
-      el('h2', { class: 'dialog-title', text: presetKey ? `${kind.name} (${kind.unit})` : 'Zapsat míru' }),
-      kindSelect ? el('label', { class: 'field' }, [el('span', { class: 'field-label', text: 'Míra' }), kindSelect]) : null,
-      el('label', { class: 'field' }, [el('span', { class: 'field-label', text: 'Hodnota' }), value]),
-      el('label', { class: 'field' }, [el('span', { class: 'field-label', text: 'Datum' }), date]),
+      el('h2', { class: 'dialog-title', text: presetKey ? `${kindName(kind)} (${kind.unit})` : t('Zapsat míru') }),
+      kindSelect ? el('label', { class: 'field' }, [el('span', { class: 'field-label', text: t('Míra') }), kindSelect]) : null,
+      el('label', { class: 'field' }, [el('span', { class: 'field-label', text: t('Hodnota') }), value]),
+      el('label', { class: 'field' }, [el('span', { class: 'field-label', text: t('Datum') }), date]),
       el('div', { class: 'dialog-actions' }, [
-        el('button', { type: 'button', class: 'btn', text: 'Zrušit', onclick: () => close(false) }),
-        el('button', { type: 'submit', class: 'btn btn-primary', text: 'Uložit' }),
+        el('button', { type: 'button', class: 'btn', text: t('Zrušit'), onclick: () => close(false) }),
+        el('button', { type: 'submit', class: 'btn btn-primary', text: t('Uložit') }),
       ]),
     ]);
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const v = parse(value);
-      if (!Number.isFinite(v)) { toast('Zadej hodnotu'); return; }
+      if (!Number.isFinite(v)) { toast(t('Zadej hodnotu')); return; }
       await addMeasurement(key, v, toIso(date.value));
-      toast('Zapsáno');
+      toast(t('Zapsáno'));
       close(true);
     });
     return form;
@@ -246,23 +247,23 @@ function newKindDialog(kinds) {
   return openDialog((close) => {
     if (!available.length) {
       return el('div', { class: 'dialog-body' }, [
-        el('h2', { class: 'dialog-title', text: 'Nová míra' }),
-        el('p', { class: 'muted', text: 'Všechny nabízené míry už máš přidané.' }),
-        el('div', { class: 'dialog-actions' }, [el('button', { type: 'button', class: 'btn btn-primary', text: 'OK', onclick: () => close(false) })]),
+        el('h2', { class: 'dialog-title', text: t('Nová míra') }),
+        el('p', { class: 'muted', text: t('Všechny nabízené míry už máš přidané.') }),
+        el('div', { class: 'dialog-actions' }, [el('button', { type: 'button', class: 'btn btn-primary', text: t('OK'), onclick: () => close(false) })]),
       ]);
     }
     const unit = el('div', { class: 'input input-static', text: available[0].unit });
     const name = el('select', {
       class: 'input',
       onchange: () => { unit.textContent = available.find((p) => p.key === name.value).unit; },
-    }, available.map((p) => el('option', { value: p.key, text: p.name })));
+    }, available.map((p) => el('option', { value: p.key, text: t(p.name) })));
     const form = el('form', { method: 'dialog', class: 'dialog-body stack-tight' }, [
-      el('h2', { class: 'dialog-title', text: 'Nová míra' }),
-      el('label', { class: 'field' }, [el('span', { class: 'field-label', text: 'Míra' }), name]),
-      el('label', { class: 'field' }, [el('span', { class: 'field-label', text: 'Jednotka' }), unit]),
+      el('h2', { class: 'dialog-title', text: t('Nová míra') }),
+      el('label', { class: 'field' }, [el('span', { class: 'field-label', text: t('Míra') }), name]),
+      el('label', { class: 'field' }, [el('span', { class: 'field-label', text: t('Jednotka') }), unit]),
       el('div', { class: 'dialog-actions' }, [
-        el('button', { type: 'button', class: 'btn', text: 'Zrušit', onclick: () => close(false) }),
-        el('button', { type: 'submit', class: 'btn btn-primary', text: 'Přidat' }),
+        el('button', { type: 'button', class: 'btn', text: t('Zrušit'), onclick: () => close(false) }),
+        el('button', { type: 'submit', class: 'btn btn-primary', text: t('Přidat') }),
       ]),
     ]);
     form.addEventListener('submit', async (e) => {
@@ -281,8 +282,8 @@ async function renderExercise(container, id, titleEl) {
     exerciseMap(), listDoneWorkouts(), listManualRecords(), listGyms(), getLastGymId(),
   ]);
   const exercise = exercises.get(id);
-  if (!exercise) { container.append(el('p', { class: 'muted', text: 'Cvik nenalezen.' })); return; }
-  titleEl.textContent = 'Výkon';
+  if (!exercise) { container.append(el('p', { class: 'muted', text: t('Cvik nenalezen.') })); return; }
+  titleEl.textContent = t('Výkon');
   let gymId = exercise.perGym ? (lastGymId ?? gyms[0]?.id) : null;
   const manual = manualAll.filter((m) => m.exerciseId === id);
   const sessions = [...done, ...manualAsWorkouts(manual, exercises)];
@@ -300,27 +301,27 @@ async function renderExercise(container, id, titleEl) {
 
     body.replaceChildren(...[
       el('section', { class: 'card' }, [
-        el('h2', { class: 'ex-name', text: exercise.name }),
+        el('h2', { class: 'ex-name', text: exName(exercise) }),
         exercise.perGym && gyms.length > 1 ? el('div', { class: 'segmented gym-seg' }, gyms.map((g) => el('button', {
           type: 'button', class: `seg ${g.id === gymId ? 'is-selected' : ''}`, text: g.name, onclick: () => { gymId = g.id; draw(); },
         }))) : null,
         el('dl', { class: 'kv' }, [
-          el('div', { class: 'kv-row' }, [el('dt', { text: 'Osobní rekord' }), el('dd', { class: 'gold', text: recordText(exercise, rec) })]),
-          rec?.maxWeight ? el('div', { class: 'kv-row' }, [el('dt', { text: 'Dosaženo' }), el('dd', { text: dateShort.format(new Date(rec.maxWeight.date)) })]) : null,
+          el('div', { class: 'kv-row' }, [el('dt', { text: t('Osobní rekord') }), el('dd', { class: 'gold', text: recordText(exercise, rec) })]),
+          rec?.maxWeight ? el('div', { class: 'kv-row' }, [el('dt', { text: t('Dosaženo') }), el('dd', { text: dateShort.format(new Date(rec.maxWeight.date)) })]) : null,
         ]),
         el('h4', { class: 'sub-title', text: exerciseChartTitle(exercise) }),
         rangeChart(points, { format: exerciseFormat(exercise) }),
-        myManual.length ? el('p', { class: 'muted small', text: 'Duté body jsou ruční záznamy.' }) : null,
+        myManual.length ? el('p', { class: 'muted small', text: t('Duté body jsou ruční záznamy.') }) : null,
       ]),
       atWeight.length ? el('section', { class: 'card' }, [
-        el('h3', { class: 'card-title', text: 'Nejvíc opakování při váze' }),
+        el('h3', { class: 'card-title', text: t('Nejvíc opakování při váze') }),
         el('dl', { class: 'kv' }, atWeight.map(([w, r]) => el('div', { class: 'kv-row' }, [
           el('dt', { text: formatWeight(w, { bodyweight: exercise.bodyweight }) }),
           el('dd', { text: `${r.value} × · ${dateShort.format(new Date(r.date))}` }),
         ]))),
       ]) : null,
       el('section', { class: 'card' }, [
-        el('h3', { class: 'card-title', text: 'Ruční záznamy' }),
+        el('h3', { class: 'card-title', text: t('Ruční záznamy') }),
         myManual.length
           ? el('ul', { class: 'list' }, myManual.map((m) => el('li', { class: 'list-row' }, [
             el('span', { class: 'list-main stat-row' }, [
@@ -328,16 +329,16 @@ async function renderExercise(container, id, titleEl) {
               el('strong', { text: formatValues({ type: exercise.type, bodyweight: exercise.bodyweight }, [m]) }),
             ]),
             el('button', {
-              type: 'button', class: 'btn btn-small btn-icon', html: '&times;', 'aria-label': 'Smazat záznam',
+              type: 'button', class: 'btn btn-small btn-icon', html: '&times;', 'aria-label': t('Smazat záznam'),
               onclick: async () => {
-                if (await confirmDialog({ title: 'Smazat ruční záznam?', okLabel: 'Smazat', danger: true })) { await deleteManualRecord(m.id); rerender(); }
+                if (await confirmDialog({ title: t('Smazat ruční záznam?'), okLabel: t('Smazat'), danger: true })) { await deleteManualRecord(m.id); rerender(); }
               },
             }),
           ])))
-          : el('p', { class: 'muted small', text: 'Např. test maxima mimo trénink.' }),
-        el('button', { type: 'button', class: 'btn', text: '+ Ruční záznam', onclick: async () => { if (await manualRecordDialog(exercise, gyms, gymId)) rerender(); } }),
+          : el('p', { class: 'muted small', text: t('Např. test maxima mimo trénink.') }),
+        el('button', { type: 'button', class: 'btn', text: t('+ Ruční záznam'), onclick: async () => { if (await manualRecordDialog(exercise, gyms, gymId)) rerender(); } }),
       ]),
-      el('button', { type: 'button', class: 'btn', text: 'Detail cviku', onclick: () => navigate(`cvik/${encodeURIComponent(id)}`) }),
+      el('button', { type: 'button', class: 'btn', text: t('Detail cviku'), onclick: () => navigate(`cvik/${encodeURIComponent(id)}`) }),
     ].filter(Boolean));
   };
   draw();
@@ -352,9 +353,9 @@ async function manualRecordDialog(exercise, gyms, presetGymId) {
   return openDialog((close) => {
     let gymId = exercise.perGym ? (presetGymId ?? gyms[0]?.id) : null;
     const step = exercise.weightStep ?? 2.5;
-    const weight = exercise.type === 'reps' ? null : stepField(exercise.bodyweight ? 'Přidaná váha (kg)' : 'Váha (kg)', 0, step, exercise.bodyweight ? null : 0);
-    const reps = exercise.type === 'time' ? null : stepField('Opakování', 1, 1, 1);
-    const seconds = exercise.type === 'time' ? stepField('Výdrž (s)', 30, 5, 0) : null;
+    const weight = exercise.type === 'reps' ? null : stepField(exercise.bodyweight ? t('Přidaná váha (kg)') : t('Váha (kg)'), 0, step, exercise.bodyweight ? null : 0);
+    const reps = exercise.type === 'time' ? null : stepField(t('Opakování'), 1, 1, 1);
+    const seconds = exercise.type === 'time' ? stepField(t('Výdrž (s)'), 30, 5, 0) : null;
     const info = el('p', { class: 'muted small' });
     const prefill = () => {
       const rec = recFor(gymId);
@@ -368,21 +369,21 @@ async function manualRecordDialog(exercise, gyms, presetGymId) {
         weight.set(w);
         reps.set(rec?.repsAtWeight.get(w)?.value ?? rec?.maxWeight?.reps ?? 1);
       }
-      info.textContent = rec && recordText(exercise, rec) !== '–' ? `Dosavadní rekord: ${recordText(exercise, rec)}` : 'Zatím bez rekordu.';
+      info.textContent = rec && recordText(exercise, rec) !== '–' ? t('Dosavadní rekord: {value}', { value: recordText(exercise, rec) }) : t('Zatím bez rekordu.');
     };
     const date = el('input', { type: 'date', class: 'input', value: today(), max: today() });
     const gymSelect = exercise.perGym && gyms.length > 1
       ? el('select', { class: 'input', onchange: (e) => { gymId = e.target.value; prefill(); } }, gyms.map((g) => el('option', { value: g.id, text: g.name, selected: g.id === gymId ? '' : null })))
       : null;
     const form = el('form', { method: 'dialog', class: 'dialog-body stack-tight' }, [
-      el('h2', { class: 'dialog-title', text: exercise.name }),
-      gymSelect ? el('label', { class: 'field' }, [el('span', { class: 'field-label', text: 'Posilovna' }), gymSelect]) : null,
+      el('h2', { class: 'dialog-title', text: exName(exercise) }),
+      gymSelect ? el('label', { class: 'field' }, [el('span', { class: 'field-label', text: t('Posilovna') }), gymSelect]) : null,
       info,
       weight?.root, reps?.root, seconds?.root,
-      el('label', { class: 'field' }, [el('span', { class: 'field-label', text: 'Datum' }), date]),
+      el('label', { class: 'field' }, [el('span', { class: 'field-label', text: t('Datum') }), date]),
       el('div', { class: 'dialog-actions' }, [
-        el('button', { type: 'button', class: 'btn', text: 'Zrušit', onclick: () => close(false) }),
-        el('button', { type: 'submit', class: 'btn btn-primary', text: 'Uložit' }),
+        el('button', { type: 'button', class: 'btn', text: t('Zrušit'), onclick: () => close(false) }),
+        el('button', { type: 'submit', class: 'btn btn-primary', text: t('Uložit') }),
       ]),
     ]);
     prefill();
@@ -391,9 +392,9 @@ async function manualRecordDialog(exercise, gyms, presetGymId) {
       const w = weight ? weight.value() : 0;
       const r = reps ? Math.round(reps.value()) : null;
       const sec = seconds ? Math.round(seconds.value()) : null;
-      if ((weight && !Number.isFinite(w)) || (reps && !(r > 0)) || (seconds && !(sec > 0))) { toast('Vyplň hodnoty'); return; }
+      if ((weight && !Number.isFinite(w)) || (reps && !(r > 0)) || (seconds && !(sec > 0))) { toast(t('Vyplň hodnoty')); return; }
       await addManualRecord({ exerciseId: exercise.id, gymId, weight: w, reps: r, seconds: sec, date: toIso(date.value) });
-      toast('Záznam uložen');
+      toast(t('Záznam uložen'));
       close(true);
     });
     return form;

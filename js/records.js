@@ -5,6 +5,7 @@
 // váze), maxSeconds (nejdelší výdrž), maxReps (nejvíc opakování bez váhy).
 
 import { slotsOf } from './recommend.js';
+import { t } from './i18n.js';
 
 export function recordKey(entry, gymId) {
   return entry.perGym ? `${entry.exerciseId}|${gymId}` : entry.exerciseId;
@@ -63,21 +64,21 @@ export function findNewRecords(workout, previousWorkouts) {
     const push = (kind, text, meta) => found.push({ entryUid: entry.uid, slot: meta.slot, kind, text });
 
     if (entry.type === 'time') {
-      if (now.maxSeconds && (!prev.maxSeconds || now.maxSeconds.value > prev.maxSeconds.value)) push('maxSeconds', 'Nejdelší výdrž', now.maxSeconds);
+      if (now.maxSeconds && (!prev.maxSeconds || now.maxSeconds.value > prev.maxSeconds.value)) push('maxSeconds', t('Nejdelší výdrž'), now.maxSeconds);
       continue;
     }
     if (entry.type === 'reps') {
-      if (now.maxReps && (!prev.maxReps || now.maxReps.value > prev.maxReps.value)) push('maxReps', 'Nejvíc opakování', now.maxReps);
+      if (now.maxReps && (!prev.maxReps || now.maxReps.value > prev.maxReps.value)) push('maxReps', t('Nejvíc opakování'), now.maxReps);
       continue;
     }
     let weightSlot = null;
     if (now.maxWeight && (!prev.maxWeight || now.maxWeight.value > prev.maxWeight.value)) {
-      push('maxWeight', 'Nejvyšší váha', now.maxWeight);
+      push('maxWeight', t('Nejvyšší váha'), now.maxWeight);
       weightSlot = now.maxWeight.slot;
     }
     for (const [weight, best] of now.repsAtWeight) {
       const was = prev.repsAtWeight.get(weight);
-      if (was && best.value > was.value && best.slot !== weightSlot) push('repsAtWeight', 'Nejvíc opakování při této váze', best);
+      if (was && best.value > was.value && best.slot !== weightSlot) push('repsAtWeight', t('Nejvíc opakování při této váze'), best);
     }
   }
   return found;

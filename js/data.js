@@ -1,6 +1,7 @@
 // Přístup k datům appky nad IndexedDB: posilovny, cviky, šablony.
 
 import { getAll, get, put, putAll, remove, getMeta, setMeta, newId } from './db.js';
+import { t, lang, exName } from './i18n.js';
 
 // ---------- Posilovny ----------
 export async function listGyms() {
@@ -44,7 +45,7 @@ export function setLastGymId(id) {
 // ---------- Cviky ----------
 export async function listExercises() {
   const list = await getAll('exercises');
-  return list.sort((a, b) => a.name.localeCompare(b.name, 'cs'));
+  return list.sort((a, b) => exName(a).localeCompare(exName(b), lang));
 }
 
 export function getExercise(id) {
@@ -105,19 +106,19 @@ export function getTemplate(id) {
 }
 
 export const EXERCISE_TYPE_LABEL = {
-  weight: 'Opakování s váhou',
-  time: 'Výdrž na čas',
-  reps: 'Opakování bez váhy',
+  weight: t('Opakování s váhou'),
+  time: t('Výdrž na čas'),
+  reps: t('Opakování bez váhy'),
 };
 
 export const EQUIPMENT_LABEL = {
-  cable: 'kladka',
-  dumbbell: 'jednoručky',
-  plate: 'kotouč',
-  body: 'vlastní váha',
-  barbell: 'velká činka',
-  machine: 'stroj',
-  other: 'jiné',
+  cable: t('kladka'),
+  dumbbell: t('jednoručky'),
+  plate: t('kotouč'),
+  body: t('vlastní váha'),
+  barbell: t('velká činka'),
+  machine: t('stroj'),
+  other: t('jiné'),
 };
 
 // ---------- Tělesné míry ----------
@@ -126,6 +127,18 @@ const DEFAULT_MEASURE_KINDS = [
   { key: 'vaha', name: 'Tělesná váha', unit: 'kg' },
   { key: 'biceps', name: 'Obvod bicepsu', unit: 'cm' },
 ];
+
+// Názvy známých měr (uložené jsou česky), v angličtině se ukazuje překlad
+const MEASURE_KIND_NAMES = {
+  vaha: 'Tělesná váha', biceps: 'Obvod bicepsu', predlokti: 'Obvod předloktí', hrudnik: 'Obvod hrudníku',
+  ramena: 'Obvod ramen', krk: 'Obvod krku', pas: 'Obvod pasu', boky: 'Obvod boků', stehno: 'Obvod stehna',
+  lytko: 'Obvod lýtka', tuk: 'Tělesný tuk', svaly: 'Svalová hmota',
+};
+
+export function kindName(kind) {
+  const cs = MEASURE_KIND_NAMES[kind?.key];
+  return lang === 'en' && cs ? t(cs) : kind?.name ?? '';
+}
 
 export async function listMeasureKinds() {
   return getMeta('measureKinds', DEFAULT_MEASURE_KINDS);
@@ -190,14 +203,14 @@ export function defaultTemplateItem(exercise) {
 // ---------- Barvy typů tréninku ----------
 // Tmavé, tlumené odstíny. Podklad řádku se z barvy dopočítá v CSS (--tc).
 export const TEMPLATE_COLORS = [
-  { key: 'red', name: 'Vínová', hex: '#7A1C2A' },
-  { key: 'blue', name: 'Modrá', hex: '#274B6D' },
-  { key: 'green', name: 'Zelená', hex: '#2C5A3C' },
-  { key: 'purple', name: 'Fialová', hex: '#4D3366' },
-  { key: 'brown', name: 'Hnědá', hex: '#6B4A2C' },
-  { key: 'petrol', name: 'Petrolejová', hex: '#245A57' },
-  { key: 'olive', name: 'Olivová', hex: '#4F5424' },
-  { key: 'gray', name: 'Grafitová', hex: '#4A4E54' },
+  { key: 'red', name: t('Vínová'), hex: '#7A1C2A' },
+  { key: 'blue', name: t('Modrá'), hex: '#274B6D' },
+  { key: 'green', name: t('Zelená'), hex: '#2C5A3C' },
+  { key: 'purple', name: t('Fialová'), hex: '#4D3366' },
+  { key: 'brown', name: t('Hnědá'), hex: '#6B4A2C' },
+  { key: 'petrol', name: t('Petrolejová'), hex: '#245A57' },
+  { key: 'olive', name: t('Olivová'), hex: '#4F5424' },
+  { key: 'gray', name: t('Grafitová'), hex: '#4A4E54' },
 ];
 
 export function templateColor(key) {

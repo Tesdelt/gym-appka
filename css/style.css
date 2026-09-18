@@ -889,3 +889,21 @@ input[type="date"].input { min-height: var(--tap); line-height: var(--tap); }
 .muscle-group-title { padding: 10px 0 2px; font-weight: 700; color: var(--text-2); font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; }
 .check-row.is-disabled { opacity: 0.4; }
 .muscle-btn { text-align: left; cursor: pointer; line-height: 1.3; padding: 10px 12px; min-height: var(--tap); }
+
+/* ---------- Výběr cviku přes celou obrazovku ---------- */
+.dialog.dialog-full { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border: 0; }
+.picker-full { display: flex; flex-direction: column; height: 100%; }
+.picker-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: calc(var(--safe-top) + 12px) var(--gutter) 10px; border-bottom: 1px solid var(--border); background: var(--bg); }
+.picker-title { margin: 0; font-family: var(--font-head); font-weight: 800; font-size: 26px; letter-spacing: 0.03em; text-transform: uppercase; }
+.picker-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: var(--gutter) var(--gutter) calc(var(--safe-bottom) + var(--gutter)); background: var(--bg); }
+.cat-card { position: relative; }
+.cat-info {
+  position: absolute; right: 4px; bottom: 4px; width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.6); background: rgba(10, 10, 10, 0.72); color: #ECEAE6;
+  font: italic 700 15px/1 Georgia, serif; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.preview-body { max-height: 88vh; overflow-y: auto; }
+.preview-pic { margin: calc(-1 * var(--gutter)) calc(-1 * var(--gutter)) 12px; background: #fff; aspect-ratio: 4 / 3; overflow: hidden; }
+.preview-pic img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.preview-body p { margin: 4px 0; }
+.preview-body .dialog-actions { position: sticky; bottom: calc(-1 * var(--gutter)); margin: 12px calc(-1 * var(--gutter)) calc(-1 * var(--gutter)); padding: 10px var(--gutter) var(--gutter); background: var(--surface); border-top: 1px solid var(--border); }

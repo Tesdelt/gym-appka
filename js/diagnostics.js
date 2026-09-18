@@ -3,6 +3,7 @@
 
 import { storageEstimate, count } from './db.js';
 import { formatBytes } from './ui.js';
+import { t } from './i18n.js';
 
 export function isStandalone() {
   return navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
@@ -18,15 +19,15 @@ export function renderDiagnostics(container) {
   const card = document.createElement('section');
   card.className = 'card';
   card.innerHTML = `
-    <h2 class="card-title">Kontrola instalace</h2>
+    <h2 class="card-title">${t('Kontrola instalace')}</h2>
     <dl class="kv">
-      <div class="kv-row"><dt>Režim</dt><dd data-k="mode">…</dd></div>
-      <div class="kv-row"><dt>Offline</dt><dd data-k="offline">…</dd></div>
-      <div class="kv-row"><dt>Připojení</dt><dd data-k="net">…</dd></div>
-      <div class="kv-row"><dt>Trvalé úložiště</dt><dd data-k="persist">…</dd></div>
-      <div class="kv-row"><dt>Obsazeno</dt><dd data-k="usage">…</dd></div>
-      <div class="kv-row"><dt>Data</dt><dd data-k="data">…</dd></div>
-      <div class="kv-row"><dt>Verze</dt><dd data-k="version">…</dd></div>
+      <div class="kv-row"><dt>${t('Režim')}</dt><dd data-k="mode">…</dd></div>
+      <div class="kv-row"><dt>${t('Offline')}</dt><dd data-k="offline">…</dd></div>
+      <div class="kv-row"><dt>${t('Připojení')}</dt><dd data-k="net">…</dd></div>
+      <div class="kv-row"><dt>${t('Trvalé úložiště')}</dt><dd data-k="persist">…</dd></div>
+      <div class="kv-row"><dt>${t('Obsazeno')}</dt><dd data-k="usage">…</dd></div>
+      <div class="kv-row"><dt>${t('Data')}</dt><dd data-k="data">…</dd></div>
+      <div class="kv-row"><dt>${t('Verze')}</dt><dd data-k="version">…</dd></div>
     </dl>`;
   container.append(card);
 
@@ -38,25 +39,25 @@ export function renderDiagnostics(container) {
 
   const refresh = async () => {
     if (!card.isConnected) return;
-    set('mode', isStandalone() ? 'Appka z plochy' : 'Prohlížeč', isStandalone());
+    set('mode', isStandalone() ? t('Appka z plochy') : t('Prohlížeč'), isStandalone());
     set('net', navigator.onLine ? 'Online' : 'Offline');
     const version = await appVersion();
     const controlled = 'serviceWorker' in navigator && Boolean(navigator.serviceWorker.controller);
-    set('offline', version && controlled ? 'Připraveno' : version ? 'Připraveno po dalším spuštění' : 'Nepřipraveno', Boolean(version));
+    set('offline', version && controlled ? t('Připraveno') : version ? t('Připraveno po dalším spuštění') : t('Nepřipraveno'), Boolean(version));
     set('version', version ?? '–');
 
     let persisted = null;
     try { persisted = navigator.storage?.persisted ? await navigator.storage.persisted() : null; } catch { /* nepodporováno */ }
-    set('persist', persisted === true ? 'Ano' : persisted === false ? 'Ne' : 'Nezjištěno', persisted !== false);
+    set('persist', persisted === true ? t('Ano') : persisted === false ? t('Ne') : t('Nezjištěno'), persisted !== false);
 
     const est = await storageEstimate();
-    set('usage', est ? `${formatBytes(est.usage)} z ${formatBytes(est.quota)}` : '–');
+    set('usage', est ? t('{used} z {total}', { used: formatBytes(est.usage), total: formatBytes(est.quota) }) : '–');
 
     try {
       const [gyms, exercises, templates, workouts] = await Promise.all(['gyms', 'exercises', 'templates', 'workouts'].map(count));
-      set('data', `${gyms} posil., ${exercises} cviků, ${templates} šablony, ${workouts} trén.`);
+      set('data', t('{gyms} posil., {exercises} cviků, {templates} šablony, {workouts} trén.', { gyms, exercises, templates, workouts }));
     } catch {
-      set('data', 'Databáze nedostupná', false);
+      set('data', t('Databáze nedostupná'), false);
     }
   };
 

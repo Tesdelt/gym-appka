@@ -15,6 +15,7 @@ import { getAll, get, put, remove, newId } from './db.js';
 import { getExercise, getTemplate, weightStepFor, setLastGymId } from './data.js';
 import { rangeFor, recommendSets, recommendDropset, slotsOf, round5 } from './recommend.js';
 import { listGoals, activeGoalFor, evaluateGoal, goalDelta } from './goals.js';
+import { t } from './i18n.js';
 
 // ---------- Načtení ----------
 export async function getActiveWorkout() {
@@ -215,9 +216,9 @@ export function slotLabel(entry, index) {
     const steps = entry.rounds[0].steps.length;
     const round = Math.floor(index / steps);
     const step = index % steps;
-    return `Kolo ${round + 1}/${entry.rounds.length}, váha ${step + 1}/${steps}`;
+    return t('Kolo {a}/{b}, váha {c}/{d}', { a: round + 1, b: entry.rounds.length, c: step + 1, d: steps });
   }
-  return `Série ${index + 1}/${entry.sets.length}`;
+  return t('Série {a}/{b}', { a: index + 1, b: entry.sets.length });
 }
 
 // Pauza po dané sérii: u drop setu jen po posledním stupni kola

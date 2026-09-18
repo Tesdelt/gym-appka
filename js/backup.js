@@ -2,6 +2,7 @@
 
 import { openDB, DB_VERSION } from './db.js';
 import { BUILTIN_IMAGES } from './builtinImages.js';
+import { t } from './i18n.js';
 
 const STORES = ['meta', 'gyms', 'exercises', 'templates', 'workouts', 'measurements', 'goals', 'images'];
 
@@ -46,7 +47,7 @@ export async function shareBackup() {
   const file = new File([JSON.stringify(data)], backupFileName(), { type: 'application/json' });
   if (navigator.canShare?.({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], title: 'Záloha Gym' });
+      await navigator.share({ files: [file], title: t('Záloha Gym') });
       return 'shared';
     } catch (err) {
       if (err?.name === 'AbortError') return 'cancelled';
@@ -65,8 +66,8 @@ export async function shareBackup() {
 
 // Kontrola souboru před importem. Vrací shrnutí, nebo vyhodí chybu.
 export function inspectBackup(data) {
-  if (!data || data.app !== 'gym-appka' || !data.stores) throw new Error('Soubor není záloha této appky.');
-  if (data.schema > DB_VERSION) throw new Error('Záloha je z novější verze appky. Nejdřív appku aktualizuj.');
+  if (!data || data.app !== 'gym-appka' || !data.stores) throw new Error(t('Soubor není záloha této appky.'));
+  if (data.schema > DB_VERSION) throw new Error(t('Záloha je z novější verze appky. Nejdřív appku aktualizuj.'));
   const s = data.stores;
   return {
     exportedAt: data.exportedAt,
@@ -100,7 +101,7 @@ export async function importData(data) {
     }
     tx.oncomplete = resolve;
     tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error ?? new Error('Import zrušen'));
+    tx.onabort = () => reject(tx.error ?? new Error(t('Import zrušen')));
   });
 }
 
@@ -115,7 +116,7 @@ export function pickBackupFile() {
       try {
         resolve(JSON.parse(await file.text()));
       } catch {
-        resolve({ error: 'Soubor nejde přečíst jako JSON.' });
+        resolve({ error: t('Soubor nejde přečíst jako JSON.') });
       }
     });
     input.click();

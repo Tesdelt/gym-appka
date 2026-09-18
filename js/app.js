@@ -3,6 +3,7 @@ import { openDB, requestPersistentStorage } from './db.js';
 import { seedIfEmpty, translateDbExercises, upgradeExerciseData } from './seed.js';
 import { applyTheme } from './theme.js';
 import { transition } from './fx.js';
+import { t, lang } from './i18n.js';
 import * as home from './views/home.js';
 import * as stats from './views/stats.js';
 import * as goals from './views/goals.js';
@@ -29,6 +30,7 @@ const extraEl = document.getElementById('topbar-extra');
 const tabs = document.querySelectorAll('.tab');
 
 applyTheme();
+translateStatic();
 init();
 
 async function init() {
@@ -39,8 +41,8 @@ async function init() {
     await upgradeExerciseData().catch((err) => console.error(err));
   } catch (err) {
     console.error('Databáze se nepodařila otevřít', err);
-    viewEl.innerHTML = `<section class="card"><h2 class="card-title">Chyba úložiště</h2>
-      <p class="muted">Databázi appky se nepodařilo otevřít. ${escapeHtml(err?.message ?? '')}</p></section>`;
+    viewEl.innerHTML = `<section class="card"><h2 class="card-title">${t('Chyba úložiště')}</h2>
+      <p class="muted">${t('Databázi appky se nepodařilo otevřít.')} ${escapeHtml(err?.message ?? '')}</p></section>`;
     return;
   }
   // Nečekáme na výsledek, jen požádáme (iOS rozhodne samo).
@@ -65,17 +67,17 @@ async function init() {
       viewEl.className = 'view';
       viewEl.replaceChildren();
       viewEl.scrollTop = 0;
-      tabs.forEach((t) => {
-        const active = t.dataset.route === tab;
-        t.classList.toggle('is-active', active);
-        if (active) t.setAttribute('aria-current', 'page');
-        else t.removeAttribute('aria-current');
+      tabs.forEach((tabEl) => {
+        const active = tabEl.dataset.route === tab;
+        tabEl.classList.toggle('is-active', active);
+        if (active) tabEl.setAttribute('aria-current', 'page');
+        else tabEl.removeAttribute('aria-current');
       });
       try {
         await view.render(viewEl, { params, extraEl, titleEl });
       } catch (err) {
         console.error(err);
-        viewEl.innerHTML = `<section class="card"><h2 class="card-title">Něco se pokazilo</h2>
+        viewEl.innerHTML = `<section class="card"><h2 class="card-title">${t('Něco se pokazilo')}</h2>
           <p class="muted">${escapeHtml(err?.message ?? String(err))}</p></section>`;
       }
     };
@@ -84,6 +86,13 @@ async function init() {
   });
 
   registerServiceWorker();
+}
+
+// Texty přímo v index.html (lišta, pruh s novou verzí)
+function translateStatic() {
+  document.documentElement.lang = lang;
+  document.querySelectorAll('[data-i18n]').forEach((node) => { node.textContent = t(node.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-aria]').forEach((node) => { node.setAttribute('aria-label', t(node.dataset.i18nAria)); });
 }
 
 function escapeHtml(text) {

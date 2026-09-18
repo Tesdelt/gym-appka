@@ -6,6 +6,7 @@
 // exercise.photoId: vlastní fotka z mobilu (IndexedDB), má přednost.
 
 import { get, put, remove, newId } from './db.js';
+import { t } from './i18n.js';
 
 const FEDB_BASE = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/';
 
@@ -72,7 +73,7 @@ export async function resizeImage(blob, max = 1200, quality = 0.85) {
     source = await new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error('Obrázek se nepodařilo načíst'));
+      img.onerror = () => reject(new Error(t('Obrázek se nepodařilo načíst')));
       img.src = URL.createObjectURL(blob);
     });
   }
@@ -85,7 +86,7 @@ export async function resizeImage(blob, max = 1200, quality = 0.85) {
   canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height);
   source.close?.();
   return new Promise((resolve, reject) => {
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Převod obrázku selhal'))), 'image/jpeg', quality);
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error(t('Převod obrázku selhal')))), 'image/jpeg', quality);
   });
 }
 
@@ -128,7 +129,7 @@ let indexPromise = null;
 export function loadDbIndex() {
   if (!indexPromise) {
     indexPromise = fetch('data/free-exercise-db.json').then((r) => {
-      if (!r.ok) throw new Error('Databázi cviků se nepodařilo načíst');
+      if (!r.ok) throw new Error(t('Databázi cviků se nepodařilo načíst'));
       return r.json();
     }).catch((err) => { indexPromise = null; throw err; });
   }
@@ -153,7 +154,7 @@ export async function czechInstructions(dbId) {
 // Podrobnosti cviku z databáze (anglický originál) – vyžaduje internet
 export async function fetchDbExercise(dbId) {
   const r = await fetch(`${FEDB_BASE}${encodeURIComponent(dbId)}.json`);
-  if (!r.ok) throw new Error('Cvik se nepodařilo stáhnout');
+  if (!r.ok) throw new Error(t('Cvik se nepodařilo stáhnout'));
   return r.json();
 }
 

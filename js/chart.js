@@ -3,6 +3,8 @@
 // points: [{ t: Date | ISO string, v: number, gold?: bool }]
 // format: (v) => text popisku hodnoty
 
+import { t, locale } from './i18n.js';
+
 const NS = 'http://www.w3.org/2000/svg';
 
 function node(tag, attrs = {}, text = null) {
@@ -12,8 +14,8 @@ function node(tag, attrs = {}, text = null) {
   return n;
 }
 
-const dateFmt = new Intl.DateTimeFormat('cs-CZ', { day: 'numeric', month: 'numeric' });
-const dateFmtYear = new Intl.DateTimeFormat('cs-CZ', { day: 'numeric', month: 'numeric', year: '2-digit' });
+const dateFmt = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'numeric' });
+const dateFmtYear = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'numeric', year: '2-digit' });
 
 export function lineChart(points, { format = (v) => String(v), height = 170 } = {}) {
   const wrap = document.createElement('div');
@@ -24,7 +26,7 @@ export function lineChart(points, { format = (v) => String(v), height = 170 } = 
     .sort((a, b) => a.t - b.t);
 
   if (data.length === 0) {
-    wrap.innerHTML = '<p class="muted small chart-empty">Zatím žádná data.</p>';
+    wrap.innerHTML = `<p class="muted small chart-empty">${t('Zatím žádná data.')}</p>`;
     return wrap;
   }
 
@@ -67,13 +69,13 @@ export function lineChart(points, { format = (v) => String(v), height = 170 } = 
     svg.append(node('circle', { cx: x(p.t), cy: y(p.v), r: p.gold ? 4.5 : 3, class: `chart-dot${p.gold ? ' is-gold' : ''}${p.manual ? ' is-manual' : ''}` }));
   }
   const last = data[data.length - 1];
-  svg.setAttribute('aria-label', `Graf, poslední hodnota ${format(last.v)}`);
+  svg.setAttribute('aria-label', t('Graf, poslední hodnota {value}', { value: format(last.v) }));
   wrap.append(svg);
   return wrap;
 }
 
 // Graf s volbou rozsahu 1 měsíc / 3 měsíce / 1 rok / vše
-const RANGES = [['1m', '1 měs.', 31], ['3m', '3 měs.', 92], ['1y', '1 rok', 366], ['all', 'Vše', null]];
+const RANGES = [['1m', t('1 měs.'), 31], ['3m', t('3 měs.'), 92], ['1y', t('1 rok'), 366], ['all', t('Vše'), null]];
 let lastRange = 'all';
 
 export function rangeChart(points, options = {}) {
@@ -110,7 +112,7 @@ export function barChart(bars, { height = 110, label = (b) => '' } = {}) {
   const pad = { l: 6, r: 6, t: 16, b: 20 };
   const max = Math.max(1, ...bars.map((b) => b.value));
   const bw = (W - pad.l - pad.r) / bars.length;
-  const svg = node('svg', { viewBox: `0 0 ${W} ${H}`, class: 'chart-svg', role: 'img', 'aria-label': 'Sloupcový graf' });
+  const svg = node('svg', { viewBox: `0 0 ${W} ${H}`, class: 'chart-svg', role: 'img', 'aria-label': t('Sloupcový graf') });
   svg.append(node('line', { x1: pad.l, x2: W - pad.r, y1: H - pad.b, y2: H - pad.b, class: 'chart-grid' }));
   bars.forEach((b, i) => {
     const h = (b.value / max) * (H - pad.t - pad.b);
