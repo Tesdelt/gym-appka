@@ -1,14 +1,15 @@
-import { el, openDialog, toast, dateShort, plural, promptText } from '../ui.js';
-import { listTemplates, listGyms, getLastGymId, colorAttrs, addTemplate } from '../data.js';
+import { el, openDialog, toast, dateShort, plural, promptText, formatValues } from '../ui.js';
+import { workSlots, isClean } from '../recommend.js';
+import { listTemplates, listGyms, getLastGymId, colorAttrs, addTemplate, exerciseMap } from '../data.js';
 import { getActiveWorkout, startWorkout, listDoneWorkouts } from '../workout.js';
 import { navigate } from '../router.js';
-import { t, locale } from '../i18n.js';
+import { t, locale, exName } from '../i18n.js';
 import { shouldRemindBackup, shareBackup, snoozeBackupReminder } from '../backup.js';
 
 export const title = t('Trénink');
 
 export async function render(container) {
-  const [active, done, templates, remind] = await Promise.all([getActiveWorkout(), listDoneWorkouts(), listTemplates(), shouldRemindBackup()]);
+  const [active, done, templates, remind, exercises] = await Promise.all([getActiveWorkout(), listDoneWorkouts(), listTemplates(), shouldRemindBackup(), exerciseMap()]);
   // u starších tréninků i rok
   const thisYear = new Date().getFullYear();
   const dateWithYear = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'numeric', year: '2-digit' });
@@ -31,14 +32,20 @@ export async function render(container) {
     el('section', {}, [
       el('h2', { class: 'section-title', text: t('Historie') }),
       done.length
-        ? el('ul', { class: 'list list-cards' }, done.map((w) => el('li', colorAttrs(colorOf(w.templateId), 'card list-row history-row'), [
-          el('button', {
-            type: 'button', class: 'list-main history-btn',
-            onclick: () => navigate(`souhrn/${w.id}`),
-          }, [
-            el('span', { class: 'history-date', text: dateOf(w.startedAt) }),
-            el('span', { class: 'history-name', text: w.name }),
-          ]),
+        ? el('div', { class: 'history' }, byMonth(done).map(({ label, items }) => el('div', { class: 'history-month' }, [
+          el('h3', { class: 'history-month-title' }, [el('span', { text: label }), el('span', { class: 'muted', text: plural(items.length, ['trénink', 'tréninky', 'tréninků'], ['workout', 'workouts']) })]),
+          el('ul', { class: 'list list-cards' }, items.map((w) => el('li', colorAttrs(colorOf(w.templateId), 'card list-row history-row'), [
+            el('button', {
+              type: 'button', class: 'list-main history-btn',
+              onclick: () => navigate(`souhrn/${w.id}`),
+            }, [
+              el('span', { class: 'history-date', text: dateOf(w.startedAt) }),
+              el('span', { class: 'history-main' }, [
+                el('span', { class: 'history-name', text: w.name }),
+                el('span', { class: 'history-sum muted small', text: headline(w, exercises) }),
+              ]),
+            ]),
+          ]))),
         ])))
         : el('p', { class: 'muted small', text: t('Zatím žádný uložený trénink.') }),
     ]),
@@ -136,4 +143,40 @@ async function createFirstTemplate() {
   if (!name) return;
   const tpl = await addTemplate(name);
   navigate(`sablona/${encodeURIComponent(tpl.id)}`);
+}
+
+// Tréninky po měsících (nejnovější nahoře)
+function byMonth(done) {
+  const fmt = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' });
+  const groups = [];
+  for (const w of done) {
+    const d = new Date(w.startedAt);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    let g = groups[groups.length - 1];
+    if (!g || g.key !== key) {
+      const label = fmt.format(d);
+      g = { key, label: label.charAt(0).toUpperCase() + label.slice(1), items: [] };
+      groups.push(g);
+    }
+    g.items.push(w);
+  }
+  return groups;
+}
+
+// Hlavní výkon tréninku: nejlepší série prvního cviku a počet pracovních sérií
+function headline(w, exercises) {
+  const sets = w.exercises.reduce((a, e) => a + workSlots(e).length, 0);
+  const entry = w.exercises.find((e) => workSlots(e).some(isClean)) ?? w.exercises.find((e) => workSlots(e).length);
+  const parts = [];
+  if (entry) {
+    const slots = workSlots(entry).filter(isClean).length ? workSlots(entry).filter(isClean) : workSlots(entry);
+    const best = slots.reduce((a, b) => {
+      if (entry.type === 'time') return (b.seconds ?? 0) > (a.seconds ?? 0) ? b : a;
+      if (entry.type === 'reps') return (b.reps ?? 0) > (a.reps ?? 0) ? b : a;
+      return (b.weight ?? 0) > (a.weight ?? 0) || ((b.weight ?? 0) === (a.weight ?? 0) && (b.reps ?? 0) > (a.reps ?? 0)) ? b : a;
+    });
+    parts.push(`${exName(exercises.get(entry.exerciseId), entry.name)} ${formatValues(entry, [best])}`);
+  }
+  parts.push(plural(sets, ['série', 'série', 'sérií'], ['set', 'sets']));
+  return parts.join(' · ');
 }

@@ -998,3 +998,44 @@ input[type="date"].input { min-height: var(--tap); line-height: var(--tap); }
 .welcome-step .prog-dot { border-color: var(--accent); color: var(--text); }
 .welcome .btn { width: 100%; }
 .welcome-hint { margin: 10px 0 0; }
+
+/* ---------- Série navíc a štítky série ---------- */
+.set-control { flex: none; display: flex; align-items: center; gap: 4px; }
+.set-btn { width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 50%; background: var(--bg); color: var(--text); font-size: 18px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+.set-btn:disabled { opacity: 0.35; cursor: default; }
+.set-btn:active:not(:disabled) { transform: scale(0.92); }
+.set-tags { display: flex; gap: 6px; margin-top: 8px; }
+.tag-chip { flex: 1 1 0; min-width: 0; min-height: 34px; padding: 0 4px; border: 1px solid var(--border); background: var(--bg); color: var(--text-2); font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.tag-chip.is-on { color: #ECEAE6; }
+.tag-chip.tag-warmup.is-on { background: #3A4A5C; border-color: #5C7896; }
+.tag-chip.tag-fail.is-on { background: var(--danger); border-color: var(--danger); }
+.tag-chip.tag-partial.is-on, .tag-chip.tag-assisted.is-on { background: #6B4A2C; border-color: #9A6B3E; }
+.tag-badges { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 6px; vertical-align: middle; }
+.tag-badge { padding: 1px 6px; font-size: 11px; font-weight: 700; border-radius: 3px; background: var(--border); color: var(--text); }
+.tag-badge.tag-warmup { background: #3A4A5C; color: #ECEAE6; }
+.tag-badge.tag-fail { background: var(--danger); color: #fff; }
+.tag-badge.tag-partial, .tag-badge.tag-assisted { background: #6B4A2C; color: #ECEAE6; }
+.sum-sets li.is-warmup { opacity: 0.6; }
+.wprog-slot.is-warmup .wprog-fill { filter: saturate(0.2) brightness(0.8); }
+.view-workout.is-compact .set-tags { margin-top: 6px; }
+.view-workout.is-compact .tag-chip { min-height: 30px; }
+.view-workout.is-tight .set-btn { width: 28px; height: 28px; }
+.set-edit .tag-badges { margin-left: 4px; }
+
+/* ---------- Historie po měsících ---------- */
+.history-month + .history-month { margin-top: 16px; }
+.history-month-title { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 6px; font-size: 15px; font-weight: 700; }
+.history-month-title .muted { font-size: 13px; font-weight: 500; }
+.history-main { display: flex; flex-direction: column; min-width: 0; }
+.history-sum { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.history-btn { align-items: center; padding-top: 6px; padding-bottom: 6px; }
+
+/* ---------- Spodní lišta akcí nad navigací ---------- */
+.actionbar {
+  flex: none; display: flex; gap: 8px; align-items: center;
+  padding: 8px var(--gutter) 24px;          /* dole místo pro vyčnívající kruh Trénink */
+  background: var(--bg); border-top: 1px solid var(--border);
+}
+.actionbar:empty { display: none; }
+.actionbar .btn { flex: 1 1 0; min-width: 0; min-height: 48px; }
+.actionbar .btn-primary { flex-grow: 1.6; }

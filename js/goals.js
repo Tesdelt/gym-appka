@@ -9,7 +9,7 @@
 //     createdAt, status, doneAt }
 
 import { getAll, put, remove, newId } from './db.js';
-import { slotsOf } from './recommend.js';
+import { slotsOf, isClean, isWork } from './recommend.js';
 
 export async function listGoals() {
   const goals = await getAll('goals');
@@ -39,7 +39,7 @@ export const METRIC_UNIT = { weight: 'kg', reps: 'opak.', seconds: 's' };
 
 // Nejlepší hodnota záznamu cviku v tréninku podle metriky
 export function bestValue(entry, metric) {
-  const slots = slotsOf(entry).filter((s) => s.done);
+  const slots = slotsOf(entry).filter(isClean);
   if (!slots.length) return null;
   if (metric === 'seconds') return Math.max(...slots.map((s) => s.seconds ?? 0));
   if (metric === 'reps') return Math.max(...slots.map((s) => s.reps ?? 0));
@@ -54,7 +54,7 @@ function sessionsWith(done, goal, after = null) {
     if (w.status && w.status !== 'done') continue;
     if (after && w.startedAt <= after) continue;
     if (goal.gymId && w.gymId !== goal.gymId) continue;
-    const entry = w.exercises.find((e) => e.exerciseId === goal.exerciseId && slotsOf(e).some((s) => s.done));
+    const entry = w.exercises.find((e) => e.exerciseId === goal.exerciseId && slotsOf(e).some(isWork));
     if (entry) out.push({ workout: w, entry });
   }
   return out;

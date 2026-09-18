@@ -4,7 +4,7 @@
 //   { id, kind: 'ex-record', exerciseId, gymId | null, weight, reps, seconds, date, note }
 
 import { getAll, put, remove, newId } from './db.js';
-import { slotsOf } from './recommend.js';
+import { slotsOf, isClean, isWork } from './recommend.js';
 import { formatWeight } from './ui.js';
 import { t, exName } from './i18n.js';
 
@@ -55,7 +55,7 @@ export function exercisePoints(sessions, exercise, gymId) {
     if (exercise.perGym && w.gymId !== gymId) continue;
     for (const entry of w.exercises) {
       if (entry.exerciseId !== exercise.id) continue;
-      const slots = slotsOf(entry).filter((s) => s.done);
+      const slots = slotsOf(entry).filter(isClean);
       if (!slots.length) continue;
       let v;
       if (exercise.type === 'time') v = Math.max(...slots.map((s) => s.seconds ?? 0));
@@ -178,7 +178,7 @@ export function exerciseUsage(done) {
   for (const w of done) {
     const seen = new Set();
     for (const e of w.exercises) {
-      if (seen.has(e.exerciseId) || !slotsOf(e).some((s) => s.done)) continue;
+      if (seen.has(e.exerciseId) || !slotsOf(e).some(isWork)) continue;
       seen.add(e.exerciseId);
       out.set(e.exerciseId, (out.get(e.exerciseId) ?? 0) + 1);
     }

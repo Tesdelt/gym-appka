@@ -4,7 +4,7 @@
 // Typy: maxWeight (nejvyšší váha), repsAtWeight (nejvíc opakování při dané
 // váze), maxSeconds (nejdelší výdrž), maxReps (nejvíc opakování bez váhy).
 
-import { slotsOf } from './recommend.js';
+import { slotsOf, isClean } from './recommend.js';
 import { t } from './i18n.js';
 
 export function recordKey(entry, gymId) {
@@ -24,7 +24,7 @@ export function computeRecords(workouts) {
       if (!records.has(key)) records.set(key, emptyRecord());
       const rec = records.get(key);
       for (const slot of slotsOf(entry)) {
-        if (!slot.done) continue;
+        if (!isClean(slot)) continue;
         applySlot(rec, entry, slot, { date: w.startedAt, workoutId: w.id });
       }
     }
@@ -59,7 +59,7 @@ export function findNewRecords(workout, previousWorkouts) {
     if (!prev) continue;
     const now = emptyRecord();
     for (const slot of slotsOf(entry)) {
-      if (slot.done) applySlot(now, entry, slot, { slot });
+      if (isClean(slot)) applySlot(now, entry, slot, { slot });
     }
     const push = (kind, text, meta) => found.push({ entryUid: entry.uid, slot: meta.slot, kind, text });
 

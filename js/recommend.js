@@ -19,9 +19,23 @@ export function rangeFor(templateSet, templateItem) {
   return { min: base, max: base + 2 };
 }
 
+// Štítky série: 'warmup' zahřívací (nepočítá se nikam), 'partial' po částech
+// a 'assisted' s dopomocí (nepočítá se jako splněná ani jako rekord), 'fail' selhání.
+export const SET_TAGS = [['warmup', 'Zahřívací'], ['fail', 'Selhání'], ['partial', 'Po částech'], ['assisted', 'S dopomocí']];
+export const hasTag = (slot, tag) => Boolean(slot.tags?.includes(tag));
+export const isWarmup = (slot) => hasTag(slot, 'warmup');
+// odcvičená pracovní série (bez zahřívacích)
+export const isWork = (slot) => slot.done && !isWarmup(slot);
+// pracovní série bez úlev – počítá se do rekordů, cílů a grafů
+export const isClean = (slot) => isWork(slot) && !hasTag(slot, 'partial') && !hasTag(slot, 'assisted');
+
+export function workSlots(entry) {
+  return slotsOf(entry).filter(isWork);
+}
+
 // Byla série splněná v plném počtu? Plán = hodnoty, se kterými série začínala.
 export function setSucceeded(entry, set) {
-  if (!set.done) return false;
+  if (!set.done || hasTag(set, 'partial') || hasTag(set, 'assisted')) return false;
   if (entry.type === 'time') return (set.seconds ?? 0) >= (set.plan.seconds ?? 0);
   return (set.reps ?? 0) >= (set.plan.reps ?? 0);
 }
@@ -39,7 +53,7 @@ function direction(entry, last) {
 
 export function doneSlots(entry) {
   if (!entry) return [];
-  return slotsOf(entry).filter((s) => s.done);
+  return workSlots(entry);
 }
 
 // Všechny série / stupně cviku v pořadí provádění
@@ -74,7 +88,7 @@ function round(kg) {
 export function recommendSets(entry, last) {
   const plan = entry.sets.map((s) => ({ weight: s.plan.weight, reps: s.plan.reps, seconds: s.plan.seconds }));
   if (!last) return plan;
-  const lastDone = last.mode === 'sets' ? last.sets.filter((s) => s.done) : doneSlots(last);
+  const lastDone = doneSlots(last);
   if (!lastDone.length) return plan;
   const dir = direction(entry, last);
   return entry.sets.map((s, i) => {

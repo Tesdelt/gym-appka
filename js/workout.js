@@ -13,7 +13,7 @@
 
 import { getAll, get, put, remove, newId } from './db.js';
 import { getExercise, getTemplate, weightStepFor, setLastGymId, defaultRest } from './data.js';
-import { rangeFor, recommendSets, recommendDropset, slotsOf, round5 } from './recommend.js';
+import { rangeFor, recommendSets, recommendDropset, slotsOf, round5, isWork, workSlots } from './recommend.js';
 import { listGoals, activeGoalFor, evaluateGoal, goalDelta } from './goals.js';
 import { t } from './i18n.js';
 
@@ -45,7 +45,7 @@ export function findLastEntry(doneWorkouts, exerciseId, perGym, gymId, before = 
   for (const w of doneWorkouts) {
     if (before && w.startedAt >= before) continue;
     if (perGym && w.gymId !== gymId) continue;
-    const entry = w.exercises.find((e) => e.exerciseId === exerciseId && slotsOf(e).some((s) => s.done));
+    const entry = w.exercises.find((e) => e.exerciseId === exerciseId && slotsOf(e).some(isWork));
     if (entry) return { entry, workout: w };
   }
   return null;
@@ -128,7 +128,7 @@ export function buildEntry(item, exercise, gymId, doneWorkouts, goals = []) {
   } else {
     entry.sets = item.sets.map((s) => slotFrom(s, rangeFor(s, item), s.rest, exercise));
     if (last) {
-      const lastDone = slotsOf(last.entry).filter((s) => s.done);
+      const lastDone = workSlots(last.entry);
       entry.sets.forEach((slot, i) => prefill(slot, lastDone[Math.min(i, lastDone.length - 1)]));
     }
     entry.rec = recommendSets(entry, last?.entry ?? null);
@@ -139,7 +139,7 @@ export function buildEntry(item, exercise, gymId, doneWorkouts, goals = []) {
   if (last) {
     entry.last = {
       date: last.workout.startedAt,
-      values: slotsOf(last.entry).filter((s) => s.done).map((s) => ({ weight: s.weight, reps: s.reps, seconds: s.seconds })),
+      values: workSlots(last.entry).map((s) => ({ weight: s.weight, reps: s.reps, seconds: s.seconds })),
       next: last.entry.next,
     };
   }
@@ -158,7 +158,7 @@ function applyGoal(entry, exercise, gymId, last, doneWorkouts, goals) {
   if (!d) return;
   const lastSlots = entry.mode === 'dropset'
     ? last.entry.rounds[last.entry.rounds.length - 1].steps
-    : slotsOf(last.entry).filter((s) => s.done);
+    : workSlots(last.entry);
   entry.rec = entry.rec.map((_, i) => {
     const ref = lastSlots[Math.min(i, lastSlots.length - 1)];
     const v = { weight: ref.weight, reps: ref.reps, seconds: ref.seconds };
@@ -329,6 +329,51 @@ export function completeCurrent(workout) {
   workout.cursor = target ?? nextUndone(workout, workout.cursor);
 }
 
+// ---------- Série navíc / méně během tréninku ----------
+// Nová série se vloží za aktuální jako kopie (stejná váha, opakování, pauza),
+// u drop setu se přidá celé kolo.
+export function addSetAfterCurrent(workout) {
+  const cur = currentSlot(workout);
+  if (!cur) return false;
+  const { entry, slot, index } = cur;
+  const copy = (s) => ({
+    plan: { weight: s.weight, reps: s.reps, seconds: s.seconds }, range: { ...s.range }, rest: s.rest,
+    weight: s.weight, reps: s.reps, seconds: s.seconds, done: false, doneAt: null, tags: [], added: true,
+  });
+  if (entry.mode === 'dropset') {
+    const steps = entry.rounds[0].steps.length;
+    const round = Math.floor(index / steps);
+    entry.rounds.splice(round + 1, 0, { steps: entry.rounds[round].steps.map(copy) });
+  } else {
+    entry.sets.splice(index + 1, 0, copy(slot));
+  }
+  return true;
+}
+
+// Odebere poslední neodcvičenou sérii cviku (u drop setu poslední neodcvičené kolo).
+// Aspoň jedna série musí zůstat.
+export function removeLastUndoneSet(workout) {
+  const cur = currentSlot(workout);
+  if (!cur) return false;
+  const { entry } = cur;
+  if (entry.mode === 'dropset') {
+    if (entry.rounds.length <= 1) return false;
+    const i = entry.rounds.map((r) => r.steps.every((st) => !st.done)).lastIndexOf(true);
+    if (i < 0) return false;
+    entry.rounds.splice(i, 1);
+  } else {
+    if (entry.sets.length <= 1) return false;
+    const i = entry.sets.map((st) => !st.done).lastIndexOf(true);
+    if (i < 0) return false;
+    entry.sets.splice(i, 1);
+  }
+  const slots = slotsOf(entry);
+  if (workout.cursor.slot >= slots.length || slots[workout.cursor.slot]?.done) {
+    workout.cursor = nextUndone(workout, { ex: workout.cursor.ex, slot: -1 }) ?? { ex: workout.cursor.ex, slot: slots.length - 1 };
+  }
+  return true;
+}
+
 // Zbývající sekundy do konce tréninku nejsou, jen celková délka.
 export function elapsedSeconds(workout, now = Date.now()) {
   const end = workout.endedAt ? new Date(workout.endedAt).getTime() : now;
@@ -377,7 +422,7 @@ export function compareWithPrevious(workout, previous) {
 }
 
 export function doneValues(entry) {
-  return slotsOf(entry).filter((s) => s.done).map((s) => ({ weight: s.weight, reps: s.reps, seconds: s.seconds }));
+  return workSlots(entry).map((s) => ({ weight: s.weight, reps: s.reps, seconds: s.seconds }));
 }
 
 function verdict(type, before, now) {

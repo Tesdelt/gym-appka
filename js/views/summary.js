@@ -3,7 +3,7 @@
 
 import { el, toast, confirmDialog, openDialog, promptText, stepField, formatValues, dateLong, timeShort } from '../ui.js';
 import { navigate } from '../router.js';
-import { slotsOf } from '../recommend.js';
+import { slotsOf, workSlots, SET_TAGS, hasTag } from '../recommend.js';
 import { findNewRecords } from '../records.js';
 import { celebrate } from '../fx.js';
 import { listGoals, evaluateGoal, markReachedGoals } from '../goals.js';
@@ -20,19 +20,19 @@ export const tab = 'domu';
 
 const SCALES = [['energy', t('Energie')], ['sleep', t('Spánek')], ['food', t('Jídlo')]];
 
-export async function render(container, { params, extraEl }) {
+export async function render(container, { params, actionEl }) {
   const id = params[0];
   const workout = id ? await getWorkout(id) : await getActiveWorkout();
   const state = { editing: false };
   const draw = async () => {
     container.replaceChildren();
-    extraEl.replaceChildren();
-    await drawSummary(container, workout, id, state, draw, extraEl);
+    actionEl.replaceChildren();
+    await drawSummary(container, workout, id, state, draw, actionEl);
   };
   await draw();
 }
 
-async function drawSummary(container, workout, id, state, redraw, extraEl) {
+async function drawSummary(container, workout, id, state, redraw, actionEl) {
   if (!workout) {
     container.append(el('section', { class: 'card' }, [
       el('h2', { class: 'card-title', text: id ? t('Trénink nenalezen') : t('Žádný rozdělaný trénink') }),
@@ -63,7 +63,7 @@ async function drawSummary(container, workout, id, state, redraw, extraEl) {
       kv(t('Datum'), `${dateLong.format(started)}, ${timeShort.format(started)}`),
       kv(t('Posilovna'), workout.gymName),
       kv(t('Délka'), formatDurationLong(elapsedSeconds(workout))),
-      kv(t('Série'), t('{n} hotových', { n: workout.exercises.reduce((a, e) => a + slotsOf(e).filter((s) => s.done).length, 0) })),
+      kv(t('Série'), t('{n} hotových', { n: workout.exercises.reduce((a, e) => a + workSlots(e).length, 0) })),
     ]),
   ]));
 
@@ -135,15 +135,16 @@ async function drawSummary(container, workout, id, state, redraw, extraEl) {
           ? el('ul', { class: 'plain-list sum-sets' }, (state.editing ? slots.map((s, i) => [s, i]) : doneSlots).map(([s, i]) => {
             const text = ` ${s.done ? formatValues(entry, [s]) : t('neodcvičeno')}${recordSlots.has(s) ? ' ★' : ''}`;
             if (!state.editing) {
-              return el('li', { class: recordSlots.has(s) ? 'gold' : '' }, [
+              return el('li', { class: `${recordSlots.has(s) ? 'gold' : ''} ${hasTag(s, 'warmup') ? 'is-warmup' : ''}` }, [
                 el('span', { class: 'muted small', text: slotLabel(entry, i) }),
                 el('span', { text }),
+                tagBadges(s),
               ]);
             }
             return el('li', {}, [el('button', {
               type: 'button', class: 'set-edit',
               onclick: async () => { if (await editSlot(entry, s)) redraw(); },
-            }, [el('span', { class: 'muted small', text: `${slotLabel(entry, i)} ✎` }), el('span', { text })])]);
+            }, [el('span', { class: 'muted small', text: `${slotLabel(entry, i)} ✎` }), el('span', {}, [el('span', { text }), tagBadges(s)])])]);
           }))
           : el('span', { class: 'muted small block', text: entry.skipped ? t('Přeskočeno') : t('Neodcvičeno') }),
         state.editing
@@ -196,12 +197,12 @@ async function drawSummary(container, workout, id, state, redraw, extraEl) {
     setTimeout(celebrate, 250);
   }
 
-  // Akce v horní liště (vždy vidět bez scrollování)
-  const btn = (text, cls, onclick) => el('button', { type: 'button', class: `btn btn-small ${cls}`.trim(), text, onclick });
+  // Akce ve spodní liště nad navigací (vždy vidět, u palce)
+  const btn = (text, cls, onclick) => el('button', { type: 'button', class: `btn ${cls}`.trim(), text, onclick });
   if (workout.status === 'active') {
-    extraEl.append(
-      btn(t('← Trénink'), '', async () => { workout.endedAt = null; await saveWorkout(workout); navigate('trenink'); }),
-      btn(t('Uložit'), 'btn-primary', async () => {
+    actionEl.append(
+      btn(t('← Zpět do tréninku'), '', async () => { workout.endedAt = null; await saveWorkout(workout); navigate('trenink'); }),
+      btn(t('Uložit trénink'), 'btn-primary', async () => {
         await finishWorkout(workout, { scales, comment: comment.value.trim() });
         const [goals, all, measurements] = await Promise.all([listGoals(), listDoneWorkouts(), listMeasurements()]);
         const reached = await markReachedGoals(goals, all, measurements);
@@ -210,7 +211,7 @@ async function drawSummary(container, workout, id, state, redraw, extraEl) {
       }),
     );
   } else if (state.editing) {
-    extraEl.append(
+    actionEl.append(
       btn(t('Zrušit'), '', async () => {
         Object.assign(workout, await getWorkout(workout.id)); // zahodit neuložené úpravy
         state.editing = false;
@@ -226,9 +227,9 @@ async function drawSummary(container, workout, id, state, redraw, extraEl) {
       }),
     );
   } else {
-    extraEl.append(
+    actionEl.append(
       btn(t('Upravit'), '', async () => { state.editing = true; await redraw(); }),
-      btn(t('Smazat'), 'btn-danger', async () => {
+      btn(t('Smazat trénink'), 'btn-danger', async () => {
         const ok = await confirmDialog({ title: t('Smazat tento trénink?'), text: t('Záznam zmizí z historie i ze statistik.'), okLabel: t('Smazat'), danger: true });
         if (ok) { await deleteWorkout(workout.id); toast(t('Trénink smazán')); navigate('domu'); }
       }),
@@ -253,9 +254,15 @@ function editSlot(entry, slot) {
       type: 'button', class: `btn btn-small ${done ? 'btn-primary' : ''}`, text: done ? t('Odcvičeno') : t('Neodcvičeno'),
       onclick: () => { done = !done; doneBtn.textContent = done ? t('Odcvičeno') : t('Neodcvičeno'); doneBtn.classList.toggle('btn-primary', done); },
     });
+    const tags = new Set(slot.tags ?? []);
+    const tagRow = el('div', { class: 'set-tags' }, SET_TAGS.map(([key, label]) => el('button', {
+      type: 'button', class: `tag-chip tag-${key} ${tags.has(key) ? 'is-on' : ''}`, text: t(label),
+      onclick: (e) => { if (tags.has(key)) tags.delete(key); else tags.add(key); e.currentTarget.classList.toggle('is-on', tags.has(key)); },
+    })));
     const form = el('form', { method: 'dialog', class: 'dialog-body' }, [
       el('h2', { class: 'dialog-title', text: t('Upravit sérii') }),
       weight?.root, reps?.root, seconds?.root,
+      tagRow,
       el('div', { class: 'note-next' }, [el('span', { class: 'muted small', text: t('Stav') }), doneBtn]),
       el('div', { class: 'dialog-actions' }, [
         el('button', { type: 'button', class: 'btn', text: t('Zrušit'), onclick: () => close(false) }),
@@ -268,8 +275,16 @@ function editSlot(entry, slot) {
       if (reps) { const v = reps.value(); if (Number.isFinite(v)) slot.reps = Math.round(v); }
       if (seconds) { const v = seconds.value(); if (Number.isFinite(v)) slot.seconds = Math.round(v); }
       if (done !== slot.done) { slot.done = done; slot.doneAt = done ? new Date().toISOString() : null; }
+      slot.tags = [...tags];
       close(true);
     });
     return form;
   });
+}
+
+// Štítky série jako malé odznaky (zahřívací, selhání, po částech, s dopomocí)
+function tagBadges(slot) {
+  const on = SET_TAGS.filter(([key]) => hasTag(slot, key));
+  if (!on.length) return null;
+  return el('span', { class: 'tag-badges' }, on.map(([key, label]) => el('span', { class: `tag-badge tag-${key}`, text: t(label) })));
 }

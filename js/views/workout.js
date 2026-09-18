@@ -3,7 +3,7 @@
 import { el, openDialog, confirmDialog, promptNumber, toast, makeSortable, dragHandle, formatWeight, formatValues, dateShort } from '../ui.js';
 import { navigate } from '../router.js';
 import { listTemplates } from '../data.js';
-import { slotsOf } from '../recommend.js';
+import { slotsOf, SET_TAGS, hasTag } from '../recommend.js';
 import { pickExercise } from '../exercisePicker.js';
 import { imageBox } from '../images.js';
 import { exerciseMap } from '../data.js';
@@ -12,7 +12,7 @@ import { listManualRecords, manualAsWorkouts } from '../stats.js';
 import { celebrate, shockwave, reducedMotion, slideOut, slideIn, onSwipe } from '../fx.js';
 import {
   getActiveWorkout, saveWorkout, deleteWorkout, currentSlot, completeCurrent, nextUndone, firstUndoneIn,
-  positionAfterConfirm, prevInOrder, adjacentExercise, listDoneWorkouts, slotLabel, restAfter, entryDone, elapsedSeconds, formatDuration, buildAdHocEntry,
+  positionAfterConfirm, prevInOrder, adjacentExercise, listDoneWorkouts, slotLabel, addSetAfterCurrent, removeLastUndoneSet, restAfter, entryDone, elapsedSeconds, formatDuration, buildAdHocEntry,
 } from '../workout.js';
 import { t, locale, exName } from '../i18n.js';
 
@@ -147,9 +147,22 @@ function currentCard(workout, cur, ctx) {
   const card = el('section', { class: 'card card-current' });
 
   // Hlavička
+  // série: − ubere poslední neodcvičenou, + vloží kopii aktuální za ni
+  const undone = slotsOf(entry).filter((st) => !st.done).length;
+  const canRemove = entry.mode === 'dropset' ? entry.rounds.length > 1 && undone > 0 : entry.sets.length > 1 && undone > 0;
   card.append(el('div', { class: 'ex-head' }, [
     el('h2', { class: 'ex-name', text: nameOf(entry, ctx) }),
-    el('span', { class: 'ex-set', text: slotLabel(entry, index) }),
+    el('div', { class: 'set-control' }, [
+      el('button', {
+        type: 'button', class: 'set-btn', text: '−', 'aria-label': entry.mode === 'dropset' ? t('Ubrat kolo') : t('Ubrat sérii'), disabled: canRemove ? null : '',
+        onclick: () => { if (removeLastUndoneSet(workout)) { ctx.save(); ctx.draw(); } },
+      }),
+      el('span', { class: 'ex-set', text: slotLabel(entry, index) }),
+      el('button', {
+        type: 'button', class: 'set-btn', text: '+', 'aria-label': entry.mode === 'dropset' ? t('Přidat kolo') : t('Přidat sérii'),
+        onclick: () => { if (addSetAfterCurrent(workout)) { ctx.save(); ctx.draw(); toast(entry.mode === 'dropset' ? t('Kolo přidáno') : t('Série přidána')); } },
+      }),
+    ]),
   ]));
 
   // Odpočet (jen výdrž): kulaté tlačítko vpravo nad sloupcem s časem
@@ -212,6 +225,21 @@ function currentCard(workout, cur, ctx) {
     }),
     restStepper(entry, index, ctx),
   ]));
+
+  // Štítky série (před potvrzením): zahřívací se nikam nepočítá, po částech
+  // a s dopomocí se nepočítá jako splněná ani jako rekord
+  card.append(el('div', { class: 'set-tags' }, SET_TAGS.map(([key, text]) => el('button', {
+    type: 'button', class: `tag-chip tag-${key} ${hasTag(slot, key) ? 'is-on' : ''}`, text: t(text), 'aria-pressed': String(hasTag(slot, key)),
+    onclick: (e) => {
+      const on = !hasTag(slot, key);
+      slot.tags = (slot.tags ?? []).filter((x) => x !== key);
+      if (on) slot.tags.push(key);
+      e.currentTarget.classList.toggle('is-on', on);
+      e.currentTarget.setAttribute('aria-pressed', String(on));
+      ctx.save();
+      ctx.progress.update(workout);
+    },
+  }))));
 
   // Navigace: malá šipka zpět, velké potvrzení vpřed
   const after = positionAfterConfirm(workout);
@@ -277,7 +305,7 @@ function currentCard(workout, cur, ctx) {
 // Je právě potvrzovaná série nový osobní rekord? (jen když cvik už má historii)
 function isNewRecord(workout, cur, ctx) {
   const { entry, slot } = cur;
-  if (slot.done) return false;
+  if (slot.done || hasTag(slot, 'warmup') || hasTag(slot, 'partial') || hasTag(slot, 'assisted')) return false;
   const key = recordKey(entry, workout.gymId);
   if (!ctx.priorRecords.get(key)) return false;
   const rec = computeRecords([...ctx.prior, { ...workout, status: 'done' }]).get(key);
@@ -660,6 +688,7 @@ function progressBar(onJump) {
           const node = slotEls[i][k];
           node.classList.toggle('is-done', slot.done);
           node.classList.toggle('is-pr', Boolean(slot.pr && slot.done));
+          node.classList.toggle('is-warmup', hasTag(slot, 'warmup'));
           node.classList.toggle('is-current', workout.cursor?.ex === i && workout.cursor?.slot === k);
         });
       });

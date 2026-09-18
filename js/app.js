@@ -28,6 +28,7 @@ addRoute('sablona', template);
 const viewEl = document.getElementById('view');
 const titleEl = document.getElementById('screen-title');
 const extraEl = document.getElementById('topbar-extra');
+const actionEl = document.getElementById('actionbar');
 const tabs = document.querySelectorAll('.tab');
 
 applyTheme();
@@ -70,6 +71,7 @@ async function init() {
       titleEl.className = 'screen-title';
       titleEl.textContent = view.title;
       extraEl.replaceChildren();
+      actionEl.replaceChildren();
       viewEl.className = 'view';
       viewEl.replaceChildren();
       viewEl.scrollTop = 0;
@@ -80,7 +82,7 @@ async function init() {
         else tabEl.removeAttribute('aria-current');
       });
       try {
-        await view.render(viewEl, { params, extraEl, titleEl });
+        await view.render(viewEl, { params, extraEl, titleEl, actionEl });
       } catch (err) {
         console.error(err);
         viewEl.innerHTML = `<section class="card"><h2 class="card-title">${t('Něco se pokazilo')}</h2>

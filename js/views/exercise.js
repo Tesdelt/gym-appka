@@ -25,17 +25,17 @@ import { t, lang, locale, exName, exText } from '../i18n.js';
 export const title = t('Cvik');
 export const tab = 'cviky';
 
-export async function render(container, { params, extraEl, titleEl }) {
+export async function render(container, { params, extraEl, titleEl, actionEl }) {
   extraEl.append(el('button', { type: 'button', class: 'btn btn-small', text: t('← Zpět'), onclick: goBack }));
 
   if (params[0] === 'db' || (params[0] === 'novy' && params[1] === 'db')) {
     titleEl.textContent = t('Katalog');
-    await renderCatalogItem(container, params[0] === 'db' ? params[1] : params[2], extraEl);
+    await renderCatalogItem(container, params[0] === 'db' ? params[1] : params[2], actionEl);
     return;
   }
   if (params[0] === 'novy') {
     titleEl.textContent = t('Nový cvik');
-    renderForm(container, emptyDraft(), { isNew: true, extraEl });
+    renderForm(container, emptyDraft(), { isNew: true, extraEl: actionEl });
     return;
   }
 
@@ -46,10 +46,10 @@ export async function render(container, { params, extraEl, titleEl }) {
   }
   if (params[1] === 'upravit') {
     titleEl.textContent = t('Upravit cvik');
-    renderForm(container, structuredClone(exercise), { isNew: false, extraEl });
+    renderForm(container, structuredClone(exercise), { isNew: false, extraEl: actionEl });
     return;
   }
-  await renderDetail(container, exercise, extraEl);
+  await renderDetail(container, exercise, actionEl);
 }
 
 function goBack() {
@@ -69,9 +69,9 @@ async function renderDetail(container, exercise, extraEl) {
 
   // Akce v horní liště
   extraEl.append(...[
-    el('button', { type: 'button', class: 'btn btn-small', text: t('Upravit'), onclick: () => navigate(`cvik/${encodeURIComponent(exercise.id)}/upravit`) }),
+    el('button', { type: 'button', class: 'btn', text: t('Upravit'), onclick: () => navigate(`cvik/${encodeURIComponent(exercise.id)}/upravit`) }),
     el('button', {
-      type: 'button', class: 'btn btn-small btn-danger', text: t('Smazat'),
+      type: 'button', class: 'btn btn-danger', text: t('Smazat cvik'),
       onclick: async () => {
         const using = await templatesUsing(exercise.id);
         if (using.length) {
@@ -186,7 +186,7 @@ async function renderDetail(container, exercise, extraEl) {
 
   function refresh() {
     container.replaceChildren();
-    extraEl.querySelectorAll('.btn:not(:first-child)').forEach((b) => b.remove());
+    extraEl.replaceChildren();
     renderDetail(container, exercise, extraEl);
   }
 }
@@ -280,7 +280,7 @@ async function renderForm(container, draft, { isNew, extraEl }) {
 
   const list = (v) => v.split(',').map((x) => x.trim()).filter(Boolean);
   const saveBtn = el('button', {
-    type: 'button', class: 'btn btn-small btn-primary', text: isNew ? t('Přidat') : t('Uložit'),
+    type: 'button', class: 'btn btn-primary', text: isNew ? t('Přidat cvik') : t('Uložit'),
     onclick: async () => {
       const n = name.value.trim();
       if (!n) { toast(t('Vyplň název')); name.focus(); return; }
@@ -389,7 +389,7 @@ async function renderCatalogItem(container, dbId, extraEl) {
 
   const equipment = EQUIPMENT_FROM_DB[meta.eq] ?? 'other';
   const addBtn = el('button', {
-    type: 'button', class: 'btn btn-small btn-primary', text: t('Přidat'),
+    type: 'button', class: 'btn btn-primary', text: t('Přidat mezi moje cviky'),
     onclick: async () => {
       addBtn.disabled = true;
       addBtn.textContent = t('Přidávám…');
