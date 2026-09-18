@@ -17,10 +17,24 @@ export function navigate(path) {
   location.hash = `#/${path}`;
 }
 
+// Zpět na předchozí stránku (včetně pozice, kam byla posunutá).
+// Bez historie (např. otevřeno přímo) jde na záložní stránku.
+let goingBack = false;
+export function goBack(fallback = 'domu') {
+  if (history.length > 1) {
+    goingBack = true;
+    history.back();
+  } else {
+    navigate(fallback);
+  }
+}
+
 export function startRouter(onChange) {
   const handle = () => {
     const { name, params } = currentRoute();
-    onChange(name, routes.get(name), params);
+    const back = goingBack;
+    goingBack = false;
+    onChange(name, routes.get(name), params, back);
   };
   window.addEventListener('hashchange', handle);
   handle();

@@ -13,7 +13,7 @@ import {
 import {
   el, promptText, confirmDialog, openDialog, toast, stepField, dragHandle, makeSortable, formatWeight, formatRest, plural,
 } from '../ui.js';
-import { navigate } from '../router.js';
+import { navigate, goBack } from '../router.js';
 import { pickExercise } from '../exercisePicker.js';
 import { rangeFor } from '../recommend.js';
 import { t, exName } from '../i18n.js';
@@ -24,7 +24,7 @@ export const tab = 'nastaveni';
 export async function render(container, { params, extraEl, titleEl }) {
   extraEl.append(el('button', {
     type: 'button', class: 'btn btn-small', text: t('← Zpět'),
-    onclick: () => (history.length > 1 ? history.back() : navigate('nastaveni')),
+    onclick: () => goBack('nastaveni'),
   }));
   const template = await getTemplate(params[0]);
   if (!template) { container.append(el('p', { class: 'muted', text: t('Typ tréninku nenalezen.') })); return; }

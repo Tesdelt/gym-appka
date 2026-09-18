@@ -58,7 +58,23 @@ async function init() {
   const TAB_ORDER = ['statistiky', 'cile', 'domu', 'cviky', 'nastaveni'];
   let prev = null;
 
-  startRouter(async (name, view, params) => {
+  // Pozice posunutí každé navštívené stránky; po návratu Zpět se obnoví
+  const scrollMemory = new Map();
+  let currentHash = location.hash;
+  const restoreScroll = (top) => {
+    // obsah se může dotahovat postupně (katalog), proto několik pokusů
+    let tries = 0;
+    const step = () => {
+      viewEl.scrollTop = top;
+      if (Math.abs(viewEl.scrollTop - top) > 2 && tries++ < 30) setTimeout(step, 60);
+    };
+    requestAnimationFrame(step);
+  };
+
+  startRouter(async (name, view, params, isBack) => {
+    scrollMemory.set(currentHash, viewEl.scrollTop);
+    currentHash = location.hash;
+    const savedTop = isBack ? scrollMemory.get(currentHash) : null;
     const tab = view.tab ?? name;
     const depth = params.length + (TAB_ORDER.includes(name) ? 0 : 1);
     let direction = 'fade';
@@ -90,7 +106,8 @@ async function init() {
       }
     };
     if (first) await update();
-    else await transition(direction, update);
+    else await transition(isBack ? 'back' : direction, update);
+    if (savedTop) restoreScroll(savedTop);
   });
 
   registerServiceWorker();

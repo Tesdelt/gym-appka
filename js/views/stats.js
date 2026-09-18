@@ -5,7 +5,7 @@
 //        #/statistiky/cvik/<id>     výkon cviku: graf, rekordy, ruční záznamy
 
 import { el, openDialog, confirmDialog, toast, stepField, formatWeight, formatValues, dateShort, plural, normalize } from '../ui.js';
-import { navigate } from '../router.js';
+import { navigate, goBack } from '../router.js';
 import {
   listMeasureKinds, saveMeasureKinds, listMeasurements, addMeasurement, deleteMeasurement,
   exerciseMap, listGyms, getLastGymId, kindName, listTemplates, templateColor,
@@ -38,7 +38,7 @@ export async function render(container, { params, extraEl, titleEl }) {
 function backButton() {
   return el('button', {
     type: 'button', class: 'btn btn-small', text: t('← Zpět'),
-    onclick: () => (history.length > 1 ? history.back() : navigate('statistiky')),
+    onclick: () => goBack('statistiky'),
   });
 }
 

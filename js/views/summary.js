@@ -2,7 +2,7 @@
 // uloženého tréninku z historie.
 
 import { el, toast, confirmDialog, openDialog, promptText, stepField, formatValues, dateLong, timeShort } from '../ui.js';
-import { navigate } from '../router.js';
+import { navigate, goBack } from '../router.js';
 import { slotsOf, workSlots, SET_TAGS, hasTag } from '../recommend.js';
 import { findNewRecords } from '../records.js';
 import { celebrate } from '../fx.js';
@@ -20,7 +20,9 @@ export const tab = 'domu';
 
 const SCALES = [['energy', t('Energie')], ['sleep', t('Spánek')], ['food', t('Jídlo')]];
 
-export async function render(container, { params, actionEl }) {
+export async function render(container, { params, actionEl, extraEl }) {
+  // uložený trénink (z historie nebo z grafu): tlačítko zpět tam, odkud jsem přišel
+  if (params[0]) extraEl.append(el('button', { type: 'button', class: 'btn btn-small', text: t('← Zpět'), onclick: () => goBack('domu') }));
   const id = params[0];
   const workout = id ? await getWorkout(id) : await getActiveWorkout();
   const state = { editing: false };

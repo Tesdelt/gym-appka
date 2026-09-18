@@ -10,7 +10,7 @@ import {
   EXERCISE_TYPE_LABEL, EQUIPMENT_LABEL,
 } from '../data.js';
 import { el, toast, confirmDialog, openDialog, formatValues, formatWeight, dateShort } from '../ui.js';
-import { navigate } from '../router.js';
+import { navigate, goBack as routerBack } from '../router.js';
 import { listDoneWorkouts, buildEntry } from '../workout.js';
 import { listGoals } from '../goals.js';
 import { computeRecords, recordKey } from '../records.js';
@@ -53,8 +53,7 @@ export async function render(container, { params, extraEl, titleEl, actionEl }) 
 }
 
 function goBack() {
-  if (history.length > 1) history.back();
-  else navigate('cviky');
+  routerBack('cviky');
 }
 
 // ---------- Detail ----------
@@ -310,7 +309,7 @@ async function renderForm(container, draft, { isNew, extraEl }) {
       toast(isNew ? t('Cvik přidán') : t('Uloženo'));
       // nový cvik: formulář se v historii nahradí detailem; úprava: návrat na detail
       if (isNew) location.replace(`#/cvik/${encodeURIComponent(ex.id)}`);
-      else history.back();
+      else routerBack('cviky');
     },
   });
 
