@@ -2,6 +2,7 @@
 
 import { el, openDialog } from './ui.js';
 import { listExercises } from './data.js';
+import { imageBox } from './images.js';
 
 export function normalize(text) {
   return String(text ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -21,9 +22,12 @@ export async function pickExercise({ title = 'Vybrat cvik', exclude = [] } = {})
     const draw = (query) => {
       const found = all.filter((e) => matchesExercise(e, query));
       list.replaceChildren(...found.map((e) => el('li', { class: 'list-row' }, [
-        el('button', { type: 'button', class: 'list-main', onclick: () => close(e) }, [
-          el('span', { class: 'block', text: e.name }),
-          el('span', { class: 'muted small block', text: (e.aliases ?? []).join(', ') }),
+        el('button', { type: 'button', class: 'list-main picker-row', onclick: () => close(e) }, [
+          imageBox(e, { cls: 'ex-thumb ex-thumb-small' }),
+          el('span', {}, [
+            el('span', { class: 'block', text: e.name }),
+            el('span', { class: 'muted small block', text: (e.aliases ?? []).join(', ') }),
+          ]),
         ]),
       ])));
       if (!found.length) list.append(el('li', { class: 'muted small', text: 'Nic nenalezeno.' }));

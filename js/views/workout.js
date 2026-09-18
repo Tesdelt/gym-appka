@@ -5,12 +5,15 @@ import { navigate } from '../router.js';
 import { listTemplates } from '../data.js';
 import { slotsOf } from '../recommend.js';
 import { pickExercise } from '../exercisePicker.js';
+import { imageBox } from '../images.js';
+import { exerciseMap } from '../data.js';
 import {
   getActiveWorkout, saveWorkout, deleteWorkout, currentSlot, completeCurrent, nextUndone, firstUndoneIn,
   positionAfterConfirm, prevInOrder, slotLabel, restAfter, entryDone, elapsedSeconds, formatDuration, buildAdHocEntry,
 } from '../workout.js';
 
 export const title = '';
+export const tab = 'domu';
 
 export async function render(container, { extraEl, titleEl }) {
   const workout = await getActiveWorkout();
@@ -40,7 +43,8 @@ export async function render(container, { extraEl, titleEl }) {
   let saveTimer = null;
   const save = () => saveWorkout(workout).catch((err) => { console.error(err); toast('Uložení selhalo'); });
   const saveLater = () => { clearTimeout(saveTimer); saveTimer = setTimeout(save, 400); };
-  const ctx = { save, saveLater, draw: () => container.replaceChildren(...screen(workout, ctx)) };
+  const exercises = await exerciseMap();
+  const ctx = { save, saveLater, exercises, draw: () => container.replaceChildren(...screen(workout, ctx)) };
 
   extraEl.append(
     el('button', { type: 'button', class: 'btn btn-small', text: 'Cviky', onclick: () => exerciseListSheet(workout, ctx) }),
@@ -107,8 +111,8 @@ function currentCard(workout, cur, ctx) {
 
   // Obrázek + minule / doporučení
   card.append(el('div', { class: 'ex-media' }, [
-    el('button', { type: 'button', class: 'ex-image', 'aria-label': 'Podrobnosti cviku', onclick: () => toast('Detail cviku přibude v kroku 5') }, [
-      el('span', { class: 'ex-image-pic', html: PLACEHOLDER_SVG }),
+    el('button', { type: 'button', class: 'ex-image', 'aria-label': 'Podrobnosti cviku', onclick: () => navigate(`cvik/${encodeURIComponent(entry.exerciseId)}`) }, [
+      imageBox(ctx.exercises.get(entry.exerciseId), { cls: 'ex-image-pic' }),
       el('span', { class: 'ex-image-label', text: 'Podrobnosti' }),
     ]),
     el('div', { class: 'ex-meta' }, [
@@ -442,6 +446,3 @@ async function exerciseListSheet(workout, ctx) {
     return body;
   });
 }
-
-const PLACEHOLDER_SVG = `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square">
-  <path d="M10 32h44M14 22v20M20 18v28M44 18v28M50 22v20"/></svg>`;

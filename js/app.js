@@ -8,6 +8,7 @@ import * as exercises from './views/exercises.js';
 import * as settings from './views/settings.js';
 import * as workout from './views/workout.js';
 import * as summary from './views/summary.js';
+import * as exercise from './views/exercise.js';
 
 addRoute('domu', home);
 addRoute('statistiky', stats);
@@ -16,6 +17,7 @@ addRoute('cviky', exercises);
 addRoute('nastaveni', settings);
 addRoute('trenink', workout);
 addRoute('souhrn', summary);
+addRoute('cvik', exercise);
 
 const viewEl = document.getElementById('view');
 const titleEl = document.getElementById('screen-title');
@@ -44,7 +46,7 @@ async function init() {
     viewEl.replaceChildren();
     viewEl.scrollTop = 0;
     tabs.forEach((tab) => {
-      const active = tab.dataset.route === name;
+      const active = tab.dataset.route === (view.tab ?? name);
       tab.classList.toggle('is-active', active);
       if (active) tab.setAttribute('aria-current', 'page');
       else tab.removeAttribute('aria-current');

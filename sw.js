@@ -1,6 +1,6 @@
 // Service worker: offline cache. Při každém nasazení zvýšit VERSION
 // a nové soubory doplnit do ASSETS.
-const VERSION = '0.3.2';
+const VERSION = '0.5.0';
 const CACHE = `gym-app-v${VERSION}`;
 
 const ASSETS = [
@@ -20,6 +20,10 @@ const ASSETS = [
   'js/records.js',
   'js/workout.js',
   'js/exercisePicker.js',
+  'js/images.js',
+  'js/builtinImages.js',
+  'js/chart.js',
+  'data/free-exercise-db.json',
   'js/views/home.js',
   'js/views/stats.js',
   'js/views/goals.js',
@@ -27,6 +31,7 @@ const ASSETS = [
   'js/views/settings.js',
   'js/views/workout.js',
   'js/views/summary.js',
+  'js/views/exercise.js',
   'fonts/barlow-400-latin-ext.woff2',
   'fonts/barlow-400-latin.woff2',
   'fonts/barlow-500-latin-ext.woff2',
@@ -39,6 +44,22 @@ const ASSETS = [
   'fonts/big-shoulders-display-700-latin.woff2',
   'fonts/big-shoulders-display-800-latin-ext.woff2',
   'fonts/big-shoulders-display-800-latin.woff2',
+  'img/exercises/dip-0.jpg',
+  'img/exercises/dip-1.jpg',
+  'img/exercises/dumbbell-brachialis-curls-0.jpg',
+  'img/exercises/dumbbell-brachialis-curls-1.jpg',
+  'img/exercises/kladka-biceps-curls-0.jpg',
+  'img/exercises/kladka-biceps-curls-1.jpg',
+  'img/exercises/kladka-pull-row-0.jpg',
+  'img/exercises/kladka-pull-row-1.jpg',
+  'img/exercises/kladka-triceps-extension-0.jpg',
+  'img/exercises/kladka-triceps-extension-1.jpg',
+  'img/exercises/shoulder-lateral-raise-0.jpg',
+  'img/exercises/shoulder-lateral-raise-1.jpg',
+  'img/exercises/shoulder-press-dumbbell-0.jpg',
+  'img/exercises/shoulder-press-dumbbell-1.jpg',
+  'img/exercises/shyb-0.jpg',
+  'img/exercises/shyb-1.jpg',
   'icons/apple-touch-icon.png',
   'icons/icon-192.png',
   'icons/icon-512.png',

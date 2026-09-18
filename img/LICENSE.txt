@@ -1,0 +1,3 @@
+Obrázky cviků pocházejí z databáze free-exercise-db
+(https://github.com/yuhonas/free-exercise-db), public domain (Unlicense).
+Zmenšeno na max. 720 px.

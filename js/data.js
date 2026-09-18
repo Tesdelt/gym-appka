@@ -1,6 +1,6 @@
 // Přístup k datům appky nad IndexedDB: posilovny, cviky, šablony.
 
-import { getAll, get, put, remove, getMeta, setMeta, newId } from './db.js';
+import { getAll, get, put, putAll, remove, getMeta, setMeta, newId } from './db.js';
 
 // ---------- Posilovny ----------
 export async function listGyms() {
@@ -55,6 +55,37 @@ export async function exerciseMap() {
   const map = new Map();
   for (const e of await getAll('exercises')) map.set(e.id, e);
   return map;
+}
+
+// Uložení cviku. Při přejmenování se nový název propíše i do uložených
+// tréninků, aby historie ukazovala aktuální název.
+export async function saveExercise(exercise) {
+  const before = await get('exercises', exercise.id);
+  exercise.updatedAt = new Date().toISOString();
+  await put('exercises', exercise);
+  if (before && before.name !== exercise.name) {
+    const workouts = await getAll('workouts');
+    const changed = workouts.filter((w) => w.exercises.some((e) => e.exerciseId === exercise.id));
+    changed.forEach((w) => w.exercises.forEach((e) => { if (e.exerciseId === exercise.id) e.name = exercise.name; }));
+    if (changed.length) await putAll('workouts', changed);
+  }
+  return exercise;
+}
+
+export function newExerciseId(name) {
+  const slug = String(name).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+  return `${slug || 'cvik'}-${newId().slice(0, 6)}`;
+}
+
+// Šablony, které cvik používají (cvik v šabloně nejde smazat)
+export async function templatesUsing(exerciseId) {
+  const templates = await getAll('templates');
+  return templates.filter((t) => t.exercises.some((e) => e.exerciseId === exerciseId));
+}
+
+export async function deleteExercise(exerciseId) {
+  await remove('exercises', exerciseId);
 }
 
 // Krok váhy pro cvik v dané posilovně (kladky mají krok zvlášť)

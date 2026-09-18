@@ -11,6 +11,7 @@ import {
 } from '../workout.js';
 
 export const title = 'Souhrn';
+export const tab = 'domu';
 
 const SCALES = [['energy', 'Energie'], ['sleep', 'Spánek'], ['food', 'Jídlo']];
 

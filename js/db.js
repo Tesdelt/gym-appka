@@ -4,6 +4,8 @@
 // tohoto pole, migrace se spouštějí postupně od verze, kterou má uživatel.
 // Data uživatele se nikdy nemažou, jen se doplňují nové sklady a indexy.
 
+import { BUILTIN_IMAGES } from './builtinImages.js';
+
 const DB_NAME = 'gym';
 
 const MIGRATIONS = [
@@ -20,6 +22,20 @@ const MIGRATIONS = [
     measurements.createIndex('kind', 'kind');
     db.createObjectStore('goals', { keyPath: 'id' });
     db.createObjectStore('images', { keyPath: 'id' });
+  },
+  // v2: obrázky předvyplněných cviků (u už uložených cviků se jen doplní)
+  (db, tx) => {
+    const store = tx.objectStore('exercises');
+    store.openCursor().onsuccess = (e) => {
+      const cursor = e.target.result;
+      if (!cursor) return;
+      const ex = cursor.value;
+      if (!ex.images && BUILTIN_IMAGES[ex.id]) {
+        ex.images = BUILTIN_IMAGES[ex.id];
+        cursor.update(ex);
+      }
+      cursor.continue();
+    };
   },
 ];
 

@@ -487,3 +487,54 @@ select.input { padding-right: 32px; background-image: none; }
 .edit-row { margin-bottom: 10px; }
 .edit-stepper .stepper-btn { min-height: 52px; }
 .edit-field { flex: 1 1 auto; min-width: 0; border: 0; text-align: center; font-family: var(--font-head); font-weight: 700; font-size: 26px; background: transparent; }
+
+/* ---------- Obrázky cviků ---------- */
+.ex-pic, .ex-thumb, .ex-hero, .ex-image-pic { position: relative; overflow: hidden; background: #fff; color: var(--border); display: flex; align-items: center; justify-content: center; }
+.is-empty { background: var(--bg); }
+.ex-pic img, .ex-thumb img, .ex-hero img, .ex-image-pic img { width: 100%; height: 100%; object-fit: cover; object-position: center 25%; display: block; }
+.ex-thumb { flex: none; width: 64px; height: 64px; border: 1px solid var(--border); }
+.ex-thumb svg { width: 36px; height: 36px; }
+.ex-thumb-small { width: 44px; height: 44px; }
+.ex-thumb-small svg { width: 26px; height: 26px; }
+.ex-image .ex-image-pic { width: 100%; flex: 1 1 auto; min-height: 0; background: #fff; }
+.ex-image .ex-image-pic.is-empty { background: transparent; }
+.ex-image { padding: 0 0 2px; overflow: hidden; }
+.ex-hero { background: #000; width: 100%; aspect-ratio: 1 / 1; max-height: 52vh; margin: calc(-1 * var(--gutter)) 0 12px; width: calc(100% + 2 * var(--gutter)); margin-left: calc(-1 * var(--gutter)); border-bottom: 1px solid var(--border); }
+.ex-hero img { object-fit: contain; }
+.ex-hero svg { width: 80px; height: 80px; }
+.ex-hero.is-toggle { cursor: pointer; }
+.ex-hero.is-toggle::after { content: '↻ druhá fáze'; position: absolute; right: 0; bottom: 0; padding: 4px 8px; font-size: 12px; font-weight: 600; background: rgba(10,10,10,0.75); color: #ECEAE6; }
+
+/* seznam cviků */
+.search-input { position: sticky; top: 0; z-index: 2; }
+.ex-card { padding: 0; }
+.ex-card-btn { display: flex; gap: 12px; align-items: center; width: 100%; padding: 10px 12px; border: 0; background: none; color: var(--text); text-align: left; cursor: pointer; }
+.ex-card-text { min-width: 0; }
+.ex-card-name { display: block; font-weight: 600; }
+.picker-row { display: flex; gap: 10px; align-items: center; padding: 6px 0; }
+
+/* detail cviku */
+.ex-detail-title p { margin: 4px 0 0; }
+.ex-detail-head .row-2 { margin-top: 12px; }
+.sub-title { margin: 14px 0 6px; font-size: 14px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.04em; }
+.prose { margin: 0; line-height: 1.5; white-space: pre-line; }
+.gym-seg { margin-bottom: 10px; }
+.kv dd.gold { color: var(--gold); }
+
+/* graf */
+.chart-svg { display: block; width: 100%; height: auto; }
+.chart-grid { stroke: var(--border); stroke-width: 1; }
+.chart-label { fill: var(--text-2); font-size: 11px; font-family: var(--font-body); }
+.chart-line { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; }
+.chart-dot { fill: var(--surface); stroke: #C23447; stroke-width: 2; }
+.chart-dot.is-gold { fill: var(--gold); stroke: var(--gold); }
+.chart-empty { margin: 0; }
+
+/* formulář cviku */
+.field { display: block; }
+.field-hint { display: block; margin-top: 4px; font-size: 13px; color: var(--text-2); }
+.check-row { display: flex; gap: 10px; align-items: flex-start; min-height: var(--tap); padding: 6px 0; font-size: 15px; }
+.checkbox { flex: none; width: 22px; height: 22px; margin: 1px 0 0; accent-color: var(--accent); }
+.gym-step-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.gym-step-row span { flex: 1 1 auto; }
+.gym-step-row .input { flex: 0 0 120px; }
