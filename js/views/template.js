@@ -8,9 +8,10 @@
 
 import {
   getTemplate, saveTemplate, deleteTemplate, exerciseMap, getExercise, defaultTemplateItem, weightStepFor,
+  TEMPLATE_COLORS, templateColor,
 } from '../data.js';
 import {
-  el, promptText, confirmDialog, toast, stepField, dragHandle, makeSortable, formatWeight, formatRest, plural,
+  el, promptText, confirmDialog, openDialog, toast, stepField, dragHandle, makeSortable, formatWeight, formatRest, plural,
 } from '../ui.js';
 import { navigate } from '../router.js';
 import { pickExercise } from '../exercisePicker.js';
@@ -72,6 +73,23 @@ async function renderTemplate(container, template, titleEl) {
           const name = await promptText({ title: 'Název typu tréninku', value: template.name });
           if (name) { template.name = name; titleEl.textContent = name; await save(); redraw(); }
         }),
+        el('div', { class: 'kv-row' }, [
+          el('dt', { text: 'Barva' }),
+          el('dd', {}, [el('button', {
+            type: 'button', class: 'color-btn',
+            onclick: async () => {
+              const key = await pickColor(template.color ?? null);
+              if (key === undefined) return;
+              template.color = key;
+              await save();
+              redraw();
+            },
+          }, [
+            el('span', { class: 'swatch', style: templateColor(template.color) ? `background: ${templateColor(template.color)}` : '' }),
+            el('span', { text: TEMPLATE_COLORS.find((c) => c.key === template.color)?.name ?? 'Bez barvy' }),
+            el('span', { class: 'muted', text: ' ✎' }),
+          ])]),
+        ]),
         editRow('Popis', template.subtitle || '–', async () => {
           const text = await promptText({ title: 'Popis (partie)', value: template.subtitle ?? '', placeholder: 'např. záda, biceps' });
           if (text != null) { template.subtitle = text; await save(); redraw(); }
@@ -310,4 +328,20 @@ function convertMode(item, mode, step) {
     delete item.rounds;
     delete item.rest;
   }
+}
+
+// Výběr barvy: vrací klíč, null (bez barvy), nebo undefined při zrušení
+function pickColor(current) {
+  return openDialog((close) => el('div', { class: 'dialog-body' }, [
+    el('h2', { class: 'dialog-title', text: 'Barva typu tréninku' }),
+    el('div', { class: 'swatch-grid' }, [
+      el('button', {
+        type: 'button', class: `swatch-choice ${current == null ? 'is-selected' : ''}`, onclick: () => close(null),
+      }, [el('span', { class: 'swatch swatch-none' }), el('span', { text: 'Bez barvy' })]),
+      ...TEMPLATE_COLORS.map((c) => el('button', {
+        type: 'button', class: `swatch-choice ${current === c.key ? 'is-selected' : ''}`, onclick: () => close(c.key),
+      }, [el('span', { class: 'swatch', style: `background: ${c.hex}` }), el('span', { text: c.name })])),
+    ]),
+    el('div', { class: 'dialog-actions' }, [el('button', { type: 'button', class: 'btn', text: 'Zrušit', onclick: () => close(undefined) })]),
+  ]));
 }

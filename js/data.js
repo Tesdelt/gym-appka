@@ -186,3 +186,26 @@ export function defaultTemplateItem(exercise) {
     : { weight: exercise.type === 'reps' ? 0 : 10, reps: 10, rest: 180 };
   return { exerciseId: exercise.id, mode: 'sets', sets: [{ ...set }, { ...set }, { ...set }], repRange: null, weightStep: null };
 }
+
+// ---------- Barvy typů tréninku ----------
+// Tmavé, tlumené odstíny. Podklad řádku se z barvy dopočítá v CSS (--tc).
+export const TEMPLATE_COLORS = [
+  { key: 'red', name: 'Vínová', hex: '#7A1C2A' },
+  { key: 'blue', name: 'Modrá', hex: '#274B6D' },
+  { key: 'green', name: 'Zelená', hex: '#2C5A3C' },
+  { key: 'purple', name: 'Fialová', hex: '#4D3366' },
+  { key: 'brown', name: 'Hnědá', hex: '#6B4A2C' },
+  { key: 'petrol', name: 'Petrolejová', hex: '#245A57' },
+  { key: 'olive', name: 'Olivová', hex: '#4F5424' },
+  { key: 'gray', name: 'Grafitová', hex: '#4A4E54' },
+];
+
+export function templateColor(key) {
+  return TEMPLATE_COLORS.find((c) => c.key === key)?.hex ?? null;
+}
+
+// Vlastnosti prvku pro zabarvení (třída + CSS proměnná), nebo prázdné
+export function colorAttrs(key, cls = '') {
+  const hex = templateColor(key);
+  return hex ? { class: `${cls} tcolor`.trim(), style: `--tc: ${hex}` } : { class: cls };
+}

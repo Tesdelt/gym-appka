@@ -145,7 +145,7 @@ function currentCard(workout, cur, ctx) {
     ]),
     el('div', { class: 'ex-meta' }, [
       el('button', {
-        type: 'button', class: 'btn btn-small btn-skip', text: 'Přeskočit cvik ⤼',
+        type: 'button', class: 'btn btn-small btn-skip', text: 'Přeskočit cvik »',
         onclick: () => {
           entry.skipped = true;
           toast(`${entry.name} přeskočen`);
@@ -455,7 +455,6 @@ function progressBar(onJump) {
           el('div', { class: 'wprog-fill' }, [el('div', { class: 'wl-wave' }), el('div', { class: 'wl-bubbles' })]),
         ])));
         root.replaceChildren(...slotEls.map((slots, i) => el('div', { class: 'wprog-ex', style: `flex-grow: ${slots.length}` }, slots)));
-        requestAnimationFrame(alignLiquid);
       }
       let done = 0;
       let total = 0;
@@ -471,6 +470,7 @@ function progressBar(onJump) {
         });
       });
       root.setAttribute('aria-valuenow', total ? Math.round((done / total) * 100) : 0);
+      requestAnimationFrame(alignLiquid);
     },
   };
 
@@ -486,7 +486,8 @@ function progressBar(onJump) {
       for (const layer of node.querySelectorAll('.wl-wave, .wl-bubbles')) {
         layer.style.left = `${-off}px`;
         layer.style.width = `${width + 60}px`;
-        const dur = layer.classList.contains('wl-wave') ? 2.6 : 1.7;
+        const fast = node.classList.contains('is-current');
+        const dur = layer.classList.contains('wl-wave') ? (fast ? 0.5 : 0.9) : (fast ? 0.35 : 0.55);
         layer.style.animationDelay = `${-(now % dur)}s`;
       }
     }

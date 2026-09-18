@@ -7,7 +7,7 @@ import { slotsOf } from '../recommend.js';
 import { findNewRecords } from '../records.js';
 import { celebrate } from '../fx.js';
 import { listGoals, evaluateGoal, markReachedGoals } from '../goals.js';
-import { exerciseMap, listMeasurements } from '../data.js';
+import { exerciseMap, listMeasurements, getTemplate, colorAttrs } from '../data.js';
 import { listManualRecords, manualAsWorkouts } from '../stats.js';
 import {
   getActiveWorkout, getWorkout, listDoneWorkouts, finishWorkout, saveWorkout, deleteWorkout,
@@ -52,8 +52,9 @@ async function drawSummary(container, workout, id, state, redraw) {
   const stack = el('div', { class: 'stack' });
   container.append(stack);
 
-  // Hlavička
-  stack.append(el('section', { class: 'card' }, [
+  // Hlavička (v barvě typu tréninku)
+  const tmpl = await getTemplate(workout.templateId);
+  stack.append(el('section', colorAttrs(tmpl?.color, 'card'), [
     el('h2', { class: 'ex-name', text: workout.name }),
     el('dl', { class: 'kv' }, [
       kv('Datum', `${dateLong.format(started)}, ${timeShort.format(started)}`),

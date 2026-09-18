@@ -745,44 +745,77 @@ input[type="date"].input { min-height: var(--tap); line-height: var(--tap); }
 .wprog { flex: none; display: flex; align-items: center; gap: 0; height: 30px; margin: -6px 0 -4px; cursor: pointer; touch-action: manipulation; }
 .wprog-ex { display: flex; align-items: center; gap: 2px; flex-basis: 0; min-width: 0; height: 100%; }
 .wprog-ex + .wprog-ex { margin-left: 4px; padding-left: 4px; background: linear-gradient(var(--text-2), var(--text-2)) left center / 2px 14px no-repeat; }
-.wprog-slot { position: relative; flex: 1 1 0; height: 5px; background: var(--border); overflow: hidden; transition: height 200ms var(--ease-out); }
-.wprog-slot.is-done { height: 8px; }
+.wprog-slot { position: relative; flex: 1 1 0; height: 6px; background: var(--border); overflow: hidden; transition: height 220ms var(--ease-out); }
+.wprog-slot.is-done { height: 12px; }
 .wprog-fill {
   position: absolute; inset: 0; overflow: hidden;
-  background: linear-gradient(180deg, #E0485C 0%, #B0141E 55%, #7A0E1B 100%);
+  background: linear-gradient(180deg, #FF5A6E 0%, #D11A2C 38%, #9A0F1E 70%, #5A0712 100%);
   transform: scaleX(0); transform-origin: left;
   transition: transform 420ms var(--ease-out);
 }
-.wprog-slot.is-done .wprog-fill { transform: scaleX(1); }
-.wprog-slot.is-current { height: 10px; background: var(--accent); box-shadow: 0 0 0 1px #C23447; }
-.wprog-slot.is-pr .wprog-fill { background: linear-gradient(180deg, #F2D58A 0%, #C8A04A 55%, #8C6A1E 100%); }
+/* lesklý odraz nahoře */
+.wprog-fill::after { content: ''; position: absolute; left: 0; right: 0; top: 1px; height: 2px; background: rgba(255, 255, 255, 0.35); pointer-events: none; }
+.wprog-slot.is-done .wprog-fill, .wprog-slot.is-current .wprog-fill { transform: scaleX(1); }
+.wprog-slot.is-pr .wprog-fill { background: linear-gradient(180deg, #FFE7A3 0%, #E0B455 38%, #B38A33 70%, #6E5214 100%); }
 .wprog-slot.is-pr { box-shadow: 0 0 6px rgba(200, 160, 74, 0.7); }
 
-/* tekutina: proudí doleva od aktuální pozice, s bublinkami */
+/* aktuální blok: nejvyšší, tekutina v něm vře a pulzuje */
+.wprog-slot.is-current { height: 16px; background: var(--accent); box-shadow: 0 0 0 1px #E0485C; animation: wl-glow 0.7s ease-in-out infinite alternate; }
+.wprog-slot.is-current .wprog-fill { background: linear-gradient(180deg, #FF7084 0%, #E0223A 35%, #A3101F 70%, #5A0712 100%); animation: wl-pulse 0.7s ease-in-out infinite alternate; }
+.wprog-slot.is-current .wl-wave { animation-duration: 0.5s; }
+.wprog-slot.is-current .wl-bubbles { animation-duration: 0.35s; }
+@keyframes wl-glow { to { box-shadow: 0 0 0 1px #FF5A6E, 0 0 10px 1px rgba(224, 34, 58, 0.75); } }
+@keyframes wl-pulse { from { filter: brightness(0.9) saturate(1.1); } to { filter: brightness(1.25) saturate(1.3); } }
+
+/* tekutina: rychle proudí doleva, napumpovaná, s černými bublinkami */
 .wl-wave, .wl-bubbles { position: absolute; top: 0; bottom: 0; left: 0; will-change: transform; pointer-events: none; }
 .wl-wave {
   background:
-    repeating-linear-gradient(105deg, transparent 0 14px, rgba(255, 190, 190, 0.28) 14px 19px, transparent 19px 30px),
-    radial-gradient(ellipse 18px 3px at 50% 0, rgba(255, 255, 255, 0.35), transparent 70%) 0 0 / 30px 100% repeat-x;
-  animation: wl-flow 2.6s linear infinite;
+    repeating-linear-gradient(110deg, transparent 0 9px, rgba(255, 170, 170, 0.55) 9px 13px, transparent 13px 20px, rgba(60, 0, 8, 0.35) 20px 24px, transparent 24px 30px),
+    radial-gradient(ellipse 14px 4px at 50% 0, rgba(255, 255, 255, 0.5), transparent 70%) 0 0 / 30px 100% repeat-x;
+  animation: wl-flow 0.9s linear infinite;
 }
 .wl-bubbles {
   background:
-    radial-gradient(circle at 20% 60%, rgba(255, 225, 225, 0.85) 0 1px, transparent 1.6px) 0 0 / 23px 100% repeat-x,
-    radial-gradient(circle at 65% 35%, rgba(255, 225, 225, 0.6) 0 0.8px, transparent 1.4px) 0 0 / 46px 100% repeat-x;
-  animation: wl-bubbles 1.7s linear infinite;
+    radial-gradient(circle at 25% 60%, rgba(0, 0, 0, 0.75) 0 1.6px, transparent 2.2px) 0 0 / 23px 100% repeat-x,
+    radial-gradient(circle at 70% 35%, rgba(0, 0, 0, 0.6) 0 1.1px, transparent 1.7px) 0 0 / 46px 100% repeat-x;
+  animation: wl-bubbles 0.55s linear infinite;
 }
 .wprog-slot.is-pr .wl-wave { background:
-    repeating-linear-gradient(105deg, transparent 0 14px, rgba(255, 245, 210, 0.45) 14px 19px, transparent 19px 30px); }
-.wprog-slot:not(.is-done) .wl-wave, .wprog-slot:not(.is-done) .wl-bubbles { animation-play-state: paused; opacity: 0; }
+    repeating-linear-gradient(110deg, transparent 0 9px, rgba(255, 250, 220, 0.6) 9px 13px, transparent 13px 20px, rgba(80, 50, 0, 0.3) 20px 24px, transparent 24px 30px); }
+.wprog-slot:not(.is-done):not(.is-current) .wl-wave, .wprog-slot:not(.is-done):not(.is-current) .wl-bubbles { animation-play-state: paused; opacity: 0; }
 @keyframes wl-flow { to { transform: translateX(-30px); } }
 @keyframes wl-bubbles {
-  0% { transform: translate(0, 1px); }
-  50% { transform: translate(-23px, -1px); }
-  100% { transform: translate(-46px, 1px); }
+  0% { transform: translate(0, 1.5px); }
+  50% { transform: translate(-23px, -1.5px); }
+  100% { transform: translate(-46px, 1.5px); }
 }
-@media (prefers-reduced-motion: reduce) { .wl-wave, .wl-bubbles { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .wl-wave, .wl-bubbles, .wprog-slot.is-current, .wprog-slot.is-current .wprog-fill { animation: none !important; } }
 .wprog-ex.is-skipped .wprog-slot { background: repeating-linear-gradient(90deg, var(--border) 0 3px, transparent 3px 6px); }
 /* místo pro vyčnívající kulaté tlačítko Trénink */
 .view { padding-bottom: calc(var(--gutter) + 22px); }
 .view-workout { padding-bottom: 24px; }
+
+/* ---------- Barvy typů tréninku ---------- */
+.tcolor { background: color-mix(in srgb, var(--tc) 38%, var(--surface)) !important; box-shadow: inset 4px 0 0 var(--tc); }
+:root[data-theme="light"] .tcolor { background: color-mix(in srgb, var(--tc) 16%, var(--surface)) !important; }
+.list-row.tcolor { padding-left: 6px; }
+.choice.tcolor.is-selected { box-shadow: inset 4px 0 0 var(--tc), 0 0 0 1px var(--text-2); }
+.color-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 0; border: 0; background: none; color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
+.swatch { display: inline-block; width: 22px; height: 22px; border: 1px solid var(--border); flex: none; }
+.swatch-none { background: repeating-linear-gradient(135deg, transparent 0 4px, var(--border) 4px 6px); }
+.swatch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.swatch-choice { display: flex; align-items: center; gap: 10px; min-height: var(--tap); padding: 0 10px; background: var(--bg); border: 1px solid var(--border); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.swatch-choice.is-selected { border-color: var(--text-2); box-shadow: inset 0 0 0 1px var(--text-2); }
+.swatch-choice .swatch { width: 26px; height: 26px; }
+
+/* ---------- Trénink bez karet: obsah až ke krajům, sekce oddělené čarou ---------- */
+.view-workout { padding: 0; gap: 0; }
+.view-workout > .card {
+  background: none; border: 0; border-bottom: 1px solid var(--border);
+  padding-left: var(--gutter); padding-right: var(--gutter);
+}
+.view-workout .card-current { padding-top: 10px; padding-bottom: 12px; }
+.view-workout .card-current.is-confirmed { box-shadow: none; }
+.view-workout .card-next { padding-top: 8px; padding-bottom: 8px; }
+.view-workout .wprog { margin: 4px var(--gutter) 26px; }

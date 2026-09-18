@@ -1,7 +1,7 @@
 // Nastavení: vzhled, typy tréninků, posilovny, záloha dat, kontrola instalace.
 
 import {
-  listGyms, addGym, renameGym, deleteGym, listTemplates, addTemplate, reorderTemplates,
+  listGyms, addGym, renameGym, deleteGym, listTemplates, addTemplate, reorderTemplates, colorAttrs,
 } from '../data.js';
 import { el, promptText, confirmDialog, toast, plural, dragHandle, makeSortable, dateShort } from '../ui.js';
 import { navigate } from '../router.js';
@@ -42,7 +42,7 @@ function renderTheme(card) {
 // ---------- Typy tréninků ----------
 async function renderTemplates(card) {
   const templates = await listTemplates();
-  const list = el('ul', { class: 'list drag-list' }, templates.map((t, i) => el('li', { class: 'list-row', 'data-index': i }, [
+  const list = el('ul', { class: 'list drag-list' }, templates.map((t, i) => el('li', { ...colorAttrs(t.color, 'list-row'), 'data-index': i }, [
     dragHandle(),
     el('button', { type: 'button', class: 'list-main', onclick: () => navigate(`sablona/${encodeURIComponent(t.id)}`) }, [
       el('span', { class: 'block', text: `${i + 1}. ${t.name}` }),

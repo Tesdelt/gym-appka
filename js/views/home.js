@@ -1,12 +1,13 @@
 import { el, openDialog, toast, dateShort, plural } from '../ui.js';
-import { listTemplates, listGyms, getLastGymId } from '../data.js';
+import { listTemplates, listGyms, getLastGymId, colorAttrs } from '../data.js';
 import { getActiveWorkout, startWorkout, listDoneWorkouts } from '../workout.js';
 import { navigate } from '../router.js';
 
 export const title = 'Trénink';
 
 export async function render(container) {
-  const [active, done] = await Promise.all([getActiveWorkout(), listDoneWorkouts()]);
+  const [active, done, templates] = await Promise.all([getActiveWorkout(), listDoneWorkouts(), listTemplates()]);
+  const colorOf = (id) => templates.find((t) => t.id === id)?.color ?? null;
 
   const hero = active
     ? el('button', {
@@ -22,7 +23,7 @@ export async function render(container) {
     el('section', {}, [
       el('h2', { class: 'section-title', text: 'Historie' }),
       done.length
-        ? el('ul', { class: 'list list-cards' }, done.map((w) => el('li', { class: 'card list-row history-row' }, [
+        ? el('ul', { class: 'list list-cards' }, done.map((w) => el('li', colorAttrs(colorOf(w.templateId), 'card list-row history-row'), [
           el('button', {
             type: 'button', class: 'list-main history-btn',
             onclick: () => navigate(`souhrn/${w.id}`),
@@ -45,7 +46,7 @@ async function onNewWorkout() {
     let gymId = lastGymId ?? gyms[0].id;
 
     const typeButtons = templates.map((t) => el('button', {
-      type: 'button', class: `choice ${t.id === templateId ? 'is-selected' : ''}`,
+      type: 'button', ...colorAttrs(t.color, `choice ${t.id === templateId ? 'is-selected' : ''}`),
       onclick: (e) => {
         templateId = t.id;
         typeButtons.forEach((b) => b.classList.toggle('is-selected', b === e.currentTarget));
