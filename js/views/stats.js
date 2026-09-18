@@ -15,7 +15,7 @@ import { computeRecords, recordKey } from '../records.js';
 import { rangeChart, barChart } from '../chart.js';
 import {
   listManualRecords, addManualRecord, deleteManualRecord, manualAsWorkouts, exercisePoints, exerciseFormat,
-  exerciseChartTitle, frequency, EX_RECORD,
+  exerciseChartTitle, frequency,
 } from '../stats.js';
 import { recordText } from './exercise.js';
 
@@ -220,13 +220,42 @@ function addMeasureDialog(kinds, presetKey = null) {
   });
 }
 
+// Předem nastavené míry a jednotky pro výběr
+const PRESET_KINDS = [
+  { key: 'vaha', name: 'Tělesná váha', unit: 'kg' },
+  { key: 'biceps', name: 'Obvod bicepsu', unit: 'cm' },
+  { key: 'predlokti', name: 'Obvod předloktí', unit: 'cm' },
+  { key: 'hrudnik', name: 'Obvod hrudníku', unit: 'cm' },
+  { key: 'ramena', name: 'Obvod ramen', unit: 'cm' },
+  { key: 'krk', name: 'Obvod krku', unit: 'cm' },
+  { key: 'pas', name: 'Obvod pasu', unit: 'cm' },
+  { key: 'boky', name: 'Obvod boků', unit: 'cm' },
+  { key: 'stehno', name: 'Obvod stehna', unit: 'cm' },
+  { key: 'lytko', name: 'Obvod lýtka', unit: 'cm' },
+  { key: 'tuk', name: 'Tělesný tuk', unit: '%' },
+  { key: 'svaly', name: 'Svalová hmota', unit: 'kg' },
+];
+const UNITS = ['cm', 'kg', '%'];
+
 function newKindDialog(kinds) {
+  const available = PRESET_KINDS.filter((p) => !kinds.some((k) => k.key === p.key));
   return openDialog((close) => {
-    const name = el('input', { type: 'text', class: 'input', placeholder: 'např. Obvod pasu', autocomplete: 'off' });
-    const unit = el('input', { type: 'text', class: 'input', value: 'cm', autocomplete: 'off' });
+    if (!available.length) {
+      return el('div', { class: 'dialog-body' }, [
+        el('h2', { class: 'dialog-title', text: 'Nová míra' }),
+        el('p', { class: 'muted', text: 'Všechny nabízené míry už máš přidané.' }),
+        el('div', { class: 'dialog-actions' }, [el('button', { type: 'button', class: 'btn btn-primary', text: 'OK', onclick: () => close(false) })]),
+      ]);
+    }
+    const unit = el('select', { class: 'input' }, UNITS.map((u) => el('option', { value: u, text: u })));
+    const name = el('select', {
+      class: 'input',
+      onchange: () => { unit.value = available.find((p) => p.key === name.value).unit; },
+    }, available.map((p) => el('option', { value: p.key, text: p.name })));
+    unit.value = available[0].unit;
     const form = el('form', { method: 'dialog', class: 'dialog-body stack-tight' }, [
       el('h2', { class: 'dialog-title', text: 'Nová míra' }),
-      el('label', { class: 'field' }, [el('span', { class: 'field-label', text: 'Název' }), name]),
+      el('label', { class: 'field' }, [el('span', { class: 'field-label', text: 'Míra' }), name]),
       el('label', { class: 'field' }, [el('span', { class: 'field-label', text: 'Jednotka' }), unit]),
       el('div', { class: 'dialog-actions' }, [
         el('button', { type: 'button', class: 'btn', text: 'Zrušit', onclick: () => close(false) }),
@@ -235,12 +264,8 @@ function newKindDialog(kinds) {
     ]);
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const n = name.value.trim();
-      if (!n) return;
-      const base = n.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'mira';
-      let key = base;
-      for (let i = 2; kinds.some((k) => k.key === key) || key === EX_RECORD; i++) key = `${base}-${i}`;
-      await saveMeasureKinds([...kinds, { key, name: n, unit: unit.value.trim() }]);
+      const preset = available.find((p) => p.key === name.value);
+      await saveMeasureKinds([...kinds, { key: preset.key, name: preset.name, unit: unit.value }]);
       close(true);
     });
     return form;
