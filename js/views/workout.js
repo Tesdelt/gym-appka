@@ -9,7 +9,7 @@ import { imageBox } from '../images.js';
 import { exerciseMap } from '../data.js';
 import { computeRecords, recordKey } from '../records.js';
 import { listManualRecords, manualAsWorkouts } from '../stats.js';
-import { celebrate, explode, reducedMotion, slideOut, slideIn, onSwipe } from '../fx.js';
+import { celebrate, shockwave, reducedMotion, slideOut, slideIn, onSwipe } from '../fx.js';
 import {
   getActiveWorkout, saveWorkout, deleteWorkout, currentSlot, completeCurrent, nextUndone, firstUndoneIn,
   positionAfterConfirm, prevInOrder, adjacentExercise, listDoneWorkouts, slotLabel, restAfter, entryDone, elapsedSeconds, formatDuration, buildAdHocEntry,
@@ -137,6 +137,9 @@ function currentCard(workout, cur, ctx) {
     el('span', { class: 'ex-set', text: slotLabel(entry, index) }),
   ]));
 
+  // Odpočet (jen výdrž): kulaté tlačítko vpravo nad sloupcem s časem
+  const cd = entry.type === 'time' ? countdown(() => slot.seconds) : null;
+
   // Obrázek + minule / doporučení
   card.append(el('div', { class: 'ex-media' }, [
     el('button', { type: 'button', class: 'ex-image', 'aria-label': 'Podrobnosti cviku', onclick: () => navigate(`cvik/${encodeURIComponent(entry.exerciseId)}`) }, [
@@ -155,11 +158,12 @@ function currentCard(workout, cur, ctx) {
       metaRow(entry.last ? `Minule ${dateShort.format(new Date(entry.last.date))}` : 'Minule', entry.last ? formatValues(entry, entry.last.values) : 'poprvé'),
       metaRow(entry.goal?.applied ? 'Doporučení podle cíle' : 'Doporučení', rec ? formatValues(entry, [rec]) : '–'),
     ]),
+    cd?.root,
   ]));
 
   // Velká čísla
   const steppers = [];
-  if (entry.type === 'weight') {
+  if (entry.type !== 'reps') {
     steppers.push(stepper({
       label: entry.bodyweight ? 'Přidaná váha' : 'Váha', unit: 'kg',
       value: () => slot.weight, display: (v) => weightDisplay(v, entry.bodyweight),
@@ -170,9 +174,8 @@ function currentCard(workout, cur, ctx) {
   if (entry.type === 'time') {
     steppers.push(stepper({
       label: 'Výdrž', unit: 's', value: () => slot.seconds, display: (v) => String(v), step: 5, min: 5,
-      set: (v) => { slot.seconds = Math.round(v); ctx.save(); }, editTitle: 'Výdrž (s)', intStep: true,
+      set: (v) => { slot.seconds = Math.round(v); ctx.save(); cd.refresh(); }, editTitle: 'Výdrž (s)', intStep: true,
     }));
-    steppers.push(countdown(() => slot.seconds, (held) => { slot.seconds = held; ctx.save(); ctx.draw(); }));
   } else {
     steppers.push(stepper({
       label: 'Opakování', unit: '', value: () => slot.reps, display: (v) => String(v), step: 1, min: 0,
@@ -304,7 +307,10 @@ function stepper({ label, unit, value, display, step, min, set, editTitle, intSt
     const v = value();
     curEl.textContent = display(v);
     const lo = round(v - step);
-    prevEl.textContent = min != null && lo < min ? '' : display(lo);
+    const hasPrev = !(min != null && lo < min);
+    // bez nižší hodnoty zůstane místo (neviditelně), ať je číslo pořád uprostřed
+    prevEl.textContent = hasPrev ? display(lo) : display(round(v + step));
+    prevEl.style.visibility = hasPrev ? '' : 'hidden';
     nextEl.textContent = display(round(v + step));
   };
   refresh();
@@ -314,7 +320,7 @@ function stepper({ label, unit, value, display, step, min, set, editTitle, intSt
     if (v === value()) return;
     set(v);
     refresh();
-    slideValue(track, Math.sign(delta));
+    slideValue(track, curEl, Math.sign(delta));
   };
   num.addEventListener('click', async () => {
     const v = await promptNumber({ title: editTitle, value: value(), step: intStep ? 1 : 'any', min, unit });
@@ -333,76 +339,81 @@ function stepper({ label, unit, value, display, step, min, set, editTitle, intSt
 }
 
 // Posun pásu čísel: při zvýšení přijede nová hodnota zprava, při snížení zleva
-function slideValue(track, dir) {
+function slideValue(track, curEl, dir) {
   if (reducedMotion() || !track.animate) return;
+  const side = dir > 0 ? curEl.nextElementSibling : curEl.previousElementSibling;
+  const d = side ? Math.abs(side.offsetLeft + side.offsetWidth / 2 - (curEl.offsetLeft + curEl.offsetWidth / 2)) : 30;
   track.animate([
-    { transform: `translateX(${dir * 50}%)` },
+    { transform: `translateX(${dir * d}px)` },
     { transform: 'none' },
   ], { duration: 170, easing: 'cubic-bezier(0.2, 0.9, 0.25, 1)' });
 }
 
-// Odpočet výdrže: Start → běží do nuly → výbuch. Klepnutím během běhu se
-// zastaví a skutečně odvisená doba se zapíše do série.
-function countdown(getSeconds, onStopEarly) {
-  const api = {};
-  const big = el('span', { class: 'cd-big', text: 'Start' });
-  const small = el('span', { class: 'cd-small', text: `${getSeconds()} s` });
-  const btn = el('button', { type: 'button', class: 'btn countdown-btn', 'aria-label': 'Odpočet výdrže' }, [big, small]);
-  let endAt = null;
-  let startedAt = null;
+// Odpočet výdrže (kulaté tlačítko). Klepnutí: start → pauza → pokračovat.
+// Na nule vlna přes obrazovku. Změna času v „Výdrž“ se hned propíše.
+function countdown(getSeconds) {
+  const big = el('span', { class: 'cd-big' });
+  const small = el('span', { class: 'cd-small' });
+  const btn = el('button', { type: 'button', class: 'countdown-btn', 'aria-label': 'Odpočet výdrže' }, [big, small]);
+  let left = null; // zbývající ms (pauza), null = připraveno
+  let endAt = null; // běží do tohoto času
   let raf = null;
   let wakeLock = null;
 
   const fmt = (sec) => (sec >= 60 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}` : String(sec));
-  const reset = () => {
-    endAt = null;
+  const setRing = (fraction) => btn.style.setProperty('--left', String(fraction));
+  const release = () => { wakeLock?.release?.().catch(() => {}); wakeLock = null; };
+  const idle = () => {
+    endAt = null; left = null;
     cancelAnimationFrame(raf);
-    btn.classList.remove('is-running', 'is-final');
-    btn.style.removeProperty('--p');
-    big.textContent = 'Start';
-    small.textContent = `${getSeconds()} s`;
-    wakeLock?.release?.().catch(() => {});
-    wakeLock = null;
+    btn.classList.remove('is-running', 'is-paused', 'is-final');
+    big.textContent = fmt(getSeconds());
+    small.textContent = 'Start';
+    setRing(1);
+    release();
   };
   const tick = () => {
-    if (!btn.isConnected) { reset(); return; }
-    const total = getSeconds();
-    const left = Math.max(0, (endAt - Date.now()) / 1000);
-    const shown = Math.ceil(left);
+    if (!btn.isConnected) { cancelAnimationFrame(raf); release(); return; }
+    const total = getSeconds() * 1000;
+    const ms = Math.max(0, endAt - Date.now());
+    const shown = Math.ceil(ms / 1000);
     big.textContent = fmt(shown);
-    btn.style.setProperty('--p', String(1 - left / total));
+    setRing(ms / total);
     btn.classList.toggle('is-final', shown <= 3 && shown > 0);
-    if (left <= 0) {
+    if (ms <= 0) {
       const r = btn.getBoundingClientRect();
-      explode(r.left + r.width / 2, r.top + r.height / 2);
-      reset();
-      big.textContent = 'Hotovo!';
-      small.textContent = `${total} s`;
-      setTimeout(() => { if (!endAt && btn.isConnected) { big.textContent = 'Start'; } }, 1800);
+      shockwave(r.left + r.width / 2, r.top + r.height / 2);
+      idle();
+      big.textContent = '✓';
+      small.textContent = 'Hotovo';
+      setTimeout(() => { if (endAt == null && left == null && btn.isConnected) idle(); }, 1800);
       return;
     }
     raf = requestAnimationFrame(tick);
   };
   btn.addEventListener('click', async () => {
-    if (endAt) {
-      const held = Math.round((Date.now() - startedAt) / 1000);
-      reset();
-      if (held > 0) { toast(`Zastaveno po ${held} s`); onStopEarly(held); }
+    if (endAt != null) {
+      // pauza: zůstane zbývající čas
+      left = Math.max(0, endAt - Date.now());
+      endAt = null;
+      cancelAnimationFrame(raf);
+      btn.classList.remove('is-running', 'is-final');
+      btn.classList.add('is-paused');
+      big.textContent = fmt(Math.ceil(left / 1000));
+      small.textContent = 'Pokračovat';
+      release();
       return;
     }
-    startedAt = Date.now();
-    endAt = startedAt + getSeconds() * 1000;
+    endAt = Date.now() + (left ?? getSeconds() * 1000);
+    left = null;
+    btn.classList.remove('is-paused');
     btn.classList.add('is-running');
-    small.textContent = 'klepni = stop';
+    small.textContent = 'Stop';
     try { wakeLock = await navigator.wakeLock?.request('screen'); } catch { /* nepodporováno */ }
     tick();
   });
-
-  api.root = el('div', { class: 'stepper' }, [
-    el('div', { class: 'stepper-label' }, [el('span', { text: 'Odpočet' })]),
-    btn,
-  ]);
-  return api;
+  idle();
+  return { root: btn, refresh: () => { if (endAt == null) idle(); } };
 }
 
 // ---------- Náhled dalšího cviku ----------

@@ -707,14 +707,6 @@ input[type="date"].input { min-height: var(--tap); line-height: var(--tap); }
   42% { opacity: 1; }
   100% { opacity: 0; }
 }
-.fx-shake { animation: fx-shake 320ms cubic-bezier(0.36, 0.07, 0.19, 0.97); }
-@keyframes fx-shake {
-  15% { transform: translateX(-4px) rotate(-0.3deg); }
-  35% { transform: translateX(4px) rotate(0.3deg); }
-  55% { transform: translateX(-3px); }
-  75% { transform: translateX(2px); }
-  100% { transform: none; }
-}
 
 /* zlaté prvky v souhrnu se jemně rozzáří */
 .card-gold { animation: fx-gold-glow 900ms ease-out; }
@@ -822,58 +814,45 @@ input[type="date"].input { min-height: var(--tap); line-height: var(--tap); }
 
 /* ---------- Sousední čísla u stepperu a posun ---------- */
 .stepper-value { position: relative; overflow: hidden; padding: 0; }
-.sv-track { position: absolute; inset: 0; display: block; will-change: transform; }
-.sv { position: absolute; top: 50%; transform: translate(-50%, -50%); white-space: nowrap; line-height: 1; pointer-events: none; }
-.sv-cur { left: 50%; }
-.sv-prev, .sv-next { font-size: 0.6em; color: var(--text-2); opacity: 0.55; }
-.sv-prev { left: 0; -webkit-mask-image: linear-gradient(to left, #000 40%, transparent 95%); mask-image: linear-gradient(to left, #000 40%, transparent 95%); }
-.sv-next { left: 100%; -webkit-mask-image: linear-gradient(to right, #000 40%, transparent 95%); mask-image: linear-gradient(to right, #000 40%, transparent 95%); }
+.sv-track { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 7px; will-change: transform; }
+.sv { flex: none; white-space: nowrap; line-height: 1; pointer-events: none; }
+.sv-prev, .sv-next { font-size: 0.55em; color: var(--text-2); opacity: 0.7; }
+.sv-prev { -webkit-mask-image: linear-gradient(to left, #000 55%, transparent); mask-image: linear-gradient(to left, #000 55%, transparent); }
+.sv-next { -webkit-mask-image: linear-gradient(to right, #000 55%, transparent); mask-image: linear-gradient(to right, #000 55%, transparent); }
 .stepper-btn { position: relative; z-index: 1; }
 
-/* ---------- Odpočet výdrže ---------- */
+/* ---------- Odpočet výdrže: kulaté tlačítko s prstencem zbývajícího času ---------- */
 .countdown-btn {
-  position: relative; overflow: hidden; width: 100%; min-height: 64px;
-  flex-direction: column; gap: 2px; padding: 0 8px;
-  background: var(--accent); border-color: var(--accent); color: #ECEAE6;
+  --left: 1;
+  position: relative; flex: none; align-self: center;
+  width: 84px; height: 84px; border-radius: 50%; padding: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  border: 0; color: #ECEAE6; cursor: pointer;
+  background: conic-gradient(#E0485C calc(var(--left) * 360deg), #3A0A12 0);
+  transition: transform 90ms var(--ease-out);
 }
-.countdown-btn::before {
-  content: ''; position: absolute; inset: 0; background: #5A0712;
-  transform: scaleX(var(--p, 0)); transform-origin: left; pointer-events: none;
-}
+.countdown-btn::before { content: ''; position: absolute; inset: 5px; border-radius: 50%; background: var(--accent); }
+.countdown-btn:active { transform: scale(0.95); }
 .countdown-btn > span { position: relative; }
-.cd-big { font-family: var(--font-head); font-weight: 800; font-size: 30px; line-height: 1; letter-spacing: 0.03em; text-transform: uppercase; }
-.cd-small { font-size: 12px; opacity: 0.8; }
-.countdown-btn.is-running { background: #C23447; border-color: #E0485C; }
+.cd-big { font-family: var(--font-head); font-weight: 800; font-size: 28px; line-height: 1; letter-spacing: 0.02em; }
+.cd-small { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.85; }
+.countdown-btn.is-running::before { background: #9A1426; }
+.countdown-btn.is-paused::before { background: #3A0A12; }
 .countdown-btn.is-final .cd-big { animation: cd-beat 1s ease-out infinite; }
-@keyframes cd-beat { 0% { transform: scale(1.35); } 40% { transform: scale(1); } }
 
-/* ---------- Výbuch s tlakovou vlnou ---------- */
-.fx-boom { position: fixed; inset: 0; z-index: 60; pointer-events: none; overflow: hidden; }
-.fx-boom > div { position: absolute; left: var(--x); top: var(--y); border-radius: 50%; transform: translate(-50%, -50%); }
-.fx-boom-flash { left: 0 !important; top: 0 !important; width: 100%; height: 100%; border-radius: 0 !important; transform: none !important;
-  background: radial-gradient(circle at var(--x) var(--y), rgba(255, 240, 200, 0.85), rgba(224, 34, 58, 0.35) 35%, transparent 70%);
-  animation: boom-flash 450ms ease-out forwards; }
-.fx-boom-core { width: 60px; height: 60px;
-  background: radial-gradient(circle, #FFFFFF 0%, #FFE08A 30%, #FF5A3C 58%, rgba(176, 20, 30, 0) 72%);
-  animation: boom-core 520ms cubic-bezier(0.1, 0.8, 0.2, 1) forwards; }
-.fx-boom-ring { width: var(--r); height: var(--r); border: 10px solid rgba(255, 210, 130, 0.85);
-  box-shadow: 0 0 30px rgba(255, 120, 60, 0.7), inset 0 0 30px rgba(255, 120, 60, 0.5);
-  animation: boom-ring 650ms cubic-bezier(0.15, 0.7, 0.3, 1) forwards; }
-.fx-boom-ring-2 { border-width: 5px; border-color: rgba(224, 34, 58, 0.8); animation-delay: 90ms; animation-duration: 750ms; opacity: 0; }
-@keyframes boom-flash { 0% { opacity: 1; } 100% { opacity: 0; } }
-@keyframes boom-core { 0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; } 60% { opacity: 1; } 100% { transform: translate(-50%, -50%) scale(7); opacity: 0; } }
-@keyframes boom-ring { 0% { transform: translate(-50%, -50%) scale(0.02); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1); opacity: 0; } }
-/* tlaková vlna projde obsahem: stlačení, odraz a otřes */
-.fx-blast { animation: fx-blast 480ms cubic-bezier(0.3, 0.7, 0.3, 1); }
-@keyframes fx-blast {
-  0% { transform: none; }
-  12% { transform: scale(0.965); filter: brightness(1.5); }
-  30% { transform: scale(1.015) translateX(-5px); filter: brightness(1.15); }
-  45% { transform: translateX(5px) translateY(-2px); }
-  60% { transform: translateX(-3px); }
-  78% { transform: translateX(2px); }
-  100% { transform: none; filter: none; }
+
+
+/* ---------- Vlna po odpočtu ---------- */
+.fx-wave { position: fixed; inset: 0; z-index: 60; pointer-events: none; overflow: hidden; }
+.fx-wave > div { position: absolute; left: var(--x); top: var(--y); border-radius: 50%; transform: translate(-50%, -50%); }
+.fx-wave-glow { width: 140px; height: 140px; background: radial-gradient(circle, rgba(255, 200, 150, 0.45), rgba(224, 72, 92, 0.18) 50%, transparent 70%); animation: wave-glow 700ms ease-out forwards; }
+.fx-wave-ring { width: var(--r); height: var(--r); border: 3px solid rgba(255, 190, 150, 0.9); box-shadow: 0 0 18px rgba(224, 72, 92, 0.6), inset 0 0 18px rgba(224, 72, 92, 0.4); animation: wave-ring 850ms cubic-bezier(0.2, 0.6, 0.35, 1) forwards; }
+@keyframes wave-glow { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); } 25% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.6); } }
+/* uprostřed dráhy vlna zesílí (silnější čára a záře), pak se rozplyne */
+@keyframes wave-ring {
+  0% { transform: translate(-50%, -50%) scale(0.03); opacity: 0.6; border-width: 2px; }
+  45% { opacity: 1; border-width: 7px; box-shadow: 0 0 34px rgba(224, 72, 92, 0.85), inset 0 0 30px rgba(224, 72, 92, 0.6); }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 0; border-width: 2px; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .fx-boom-core, .fx-boom-ring { display: none; }
-}
+@media (prefers-reduced-motion: reduce) { .fx-wave-ring { display: none; } }
+

@@ -14,13 +14,33 @@ export function celebrate() {
   document.body.append(flash);
   flash.addEventListener('animationend', () => flash.remove(), { once: true });
   setTimeout(() => flash.remove(), 1200);
-  if (!reducedMotion()) {
-    const app = document.getElementById('app');
-    app.classList.remove('fx-shake');
-    void app.offsetWidth; // restart animace
-    app.classList.add('fx-shake');
-    app.addEventListener('animationend', () => app.classList.remove('fx-shake'), { once: true });
-  }
+  shake([
+    { transform: 'none' },
+    { transform: 'translateX(-4px)' },
+    { transform: 'translateX(4px)' },
+    { transform: 'translateX(-3px)' },
+    { transform: 'translateX(2px)' },
+    { transform: 'none' },
+  ], 320);
+}
+
+// Otřes celé appky. Animace se po skončení zruší (cancel) a styl se vyčistí,
+// aby na iOS nezůstal „viset“ rozpracovaný posun.
+let shaking = null;
+export function shake(keyframes, duration) {
+  if (reducedMotion()) return;
+  const app = document.getElementById('app');
+  if (!app?.animate) return;
+  shaking?.cancel();
+  const anim = app.animate(keyframes, { duration, easing: 'cubic-bezier(0.36, 0.07, 0.19, 0.97)' });
+  shaking = anim;
+  const clean = () => {
+    anim.cancel();
+    if (shaking === anim) shaking = null;
+    app.style.transform = '';
+  };
+  anim.finished.then(clean, clean);
+  setTimeout(clean, duration + 150);
 }
 
 // Číslo se „přetočí“: nová hodnota přijede zespodu (nahoru) nebo shora (dolů)
@@ -101,22 +121,21 @@ export async function transition(direction, update) {
   try { await t.updateCallbackDone; } catch { /* chyba vykreslení se hlásí jinde */ }
 }
 
-// Výbuch s tlakovou vlnou z bodu (x, y) do celé obrazovky, ~0,7 s
-export function explode(x, y) {
+// Vlna z bodu (x, y) přes celou obrazovku; uprostřed dráhy lehce zesílí
+export function shockwave(x, y) {
   const layer = document.createElement('div');
-  layer.className = 'fx-boom';
+  layer.className = 'fx-wave';
   const reach = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y)) * 2;
   layer.style.setProperty('--x', `${x}px`);
   layer.style.setProperty('--y', `${y}px`);
   layer.style.setProperty('--r', `${reach}px`);
-  layer.innerHTML = '<div class="fx-boom-flash"></div><div class="fx-boom-core"></div><div class="fx-boom-ring"></div><div class="fx-boom-ring fx-boom-ring-2"></div>';
+  layer.innerHTML = '<div class="fx-wave-glow"></div><div class="fx-wave-ring"></div>';
   document.body.append(layer);
-  setTimeout(() => layer.remove(), 900);
-  if (!reducedMotion()) {
-    const app = document.getElementById('app');
-    app.classList.remove('fx-blast');
-    void app.offsetWidth;
-    app.classList.add('fx-blast');
-    app.addEventListener('animationend', () => app.classList.remove('fx-blast'), { once: true });
-  }
+  setTimeout(() => layer.remove(), 1000);
+  shake([
+    { transform: 'none' },
+    { transform: 'scale(0.992)', offset: 0.35 },
+    { transform: 'scale(1.004)', offset: 0.6 },
+    { transform: 'none' },
+  ], 600);
 }
