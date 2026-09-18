@@ -238,7 +238,9 @@ export function currentSlot(workout) {
   return { entry, slot: slots[c.slot], index: c.slot };
 }
 
+// Cvik je vyřízený, když má všechny série hotové, nebo byl přeskočen.
 export function entryDone(entry) {
+  if (entry.skipped) return true;
   const slots = slotsOf(entry);
   return slots.length > 0 && slots.every((s) => s.done);
 }
@@ -250,6 +252,7 @@ export function nextUndone(workout, from) {
   const start = from ?? { ex: 0, slot: -1 };
   for (let k = 0; k < n; k++) {
     const ex = (start.ex + k) % n;
+    if (workout.exercises[ex].skipped) continue;
     const slots = slotsOf(workout.exercises[ex]);
     const begin = k === 0 ? start.slot + 1 : 0;
     for (let i = begin; i < slots.length; i++) {
@@ -257,6 +260,7 @@ export function nextUndone(workout, from) {
     }
   }
   // dříve přeskočené série ve stejném cviku
+  if (workout.exercises[start.ex]?.skipped) return null;
   const slots = slotsOf(workout.exercises[start.ex]);
   for (let i = 0; i <= start.slot && i < slots.length; i++) {
     if (!slots[i].done) return { ex: start.ex, slot: i };
@@ -274,7 +278,20 @@ export function nextInOrder(workout, from) {
   if (!from) return null;
   const slots = slotsOf(workout.exercises[from.ex]);
   if (from.slot + 1 < slots.length) return { ex: from.ex, slot: from.slot + 1 };
-  if (from.ex + 1 < workout.exercises.length) return { ex: from.ex + 1, slot: 0 };
+  for (let ex = from.ex + 1; ex < workout.exercises.length; ex++) {
+    if (!workout.exercises[ex].skipped) return { ex, slot: 0 };
+  }
+  return null;
+}
+
+// Sousední cvik (dir 1 = další, -1 = předchozí), přeskočené se vynechají.
+// Pozice je první neodcvičená série cviku.
+export function adjacentExercise(workout, from, dir) {
+  if (!from) return null;
+  for (let ex = from.ex + dir; ex >= 0 && ex < workout.exercises.length; ex += dir) {
+    const entry = workout.exercises[ex];
+    if (!entry.skipped) return { ex, slot: firstUndoneIn(entry) };
+  }
   return null;
 }
 
@@ -282,9 +299,8 @@ export function nextInOrder(workout, from) {
 export function prevInOrder(workout, from) {
   if (!from) return null;
   if (from.slot > 0) return { ex: from.ex, slot: from.slot - 1 };
-  if (from.ex > 0) {
-    const ex = from.ex - 1;
-    return { ex, slot: slotsOf(workout.exercises[ex]).length - 1 };
+  for (let ex = from.ex - 1; ex >= 0; ex--) {
+    if (!workout.exercises[ex].skipped) return { ex, slot: slotsOf(workout.exercises[ex]).length - 1 };
   }
   return null;
 }

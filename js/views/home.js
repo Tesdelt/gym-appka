@@ -3,7 +3,7 @@ import { listTemplates, listGyms, getLastGymId } from '../data.js';
 import { getActiveWorkout, startWorkout, listDoneWorkouts } from '../workout.js';
 import { navigate } from '../router.js';
 
-export const title = 'Domů';
+export const title = 'Trénink';
 
 export async function render(container) {
   const [active, done] = await Promise.all([getActiveWorkout(), listDoneWorkouts()]);

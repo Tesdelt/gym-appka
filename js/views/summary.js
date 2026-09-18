@@ -141,7 +141,7 @@ async function drawSummary(container, workout, id, state, redraw) {
               onclick: async () => { if (await editSlot(entry, s)) redraw(); },
             }, [el('span', { class: 'muted small', text: `${slotLabel(entry, i)} ✎` }), el('span', { text })])]);
           }))
-          : el('span', { class: 'muted small block', text: 'Neodcvičeno' }),
+          : el('span', { class: 'muted small block', text: entry.skipped ? 'Přeskočeno' : 'Neodcvičeno' }),
         state.editing
           ? el('button', {
             type: 'button', class: 'btn btn-small', text: entry.note ? `Poznámka: ${entry.note}` : 'Přidat poznámku',

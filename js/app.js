@@ -44,7 +44,7 @@ async function init() {
   // Nečekáme na výsledek, jen požádáme (iOS rozhodne samo).
   requestPersistentStorage();
 
-  const TAB_ORDER = ['domu', 'statistiky', 'cile', 'cviky', 'nastaveni'];
+  const TAB_ORDER = ['statistiky', 'cile', 'domu', 'cviky', 'nastaveni'];
   let prev = null;
 
   startRouter(async (name, view, params) => {

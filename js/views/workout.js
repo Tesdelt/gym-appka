@@ -12,7 +12,7 @@ import { listManualRecords, manualAsWorkouts } from '../stats.js';
 import { celebrate, roll, slideOut, slideIn, onSwipe } from '../fx.js';
 import {
   getActiveWorkout, saveWorkout, deleteWorkout, currentSlot, completeCurrent, nextUndone, firstUndoneIn,
-  positionAfterConfirm, prevInOrder, nextInOrder, listDoneWorkouts, slotLabel, restAfter, entryDone, elapsedSeconds, formatDuration, buildAdHocEntry,
+  positionAfterConfirm, prevInOrder, adjacentExercise, listDoneWorkouts, slotLabel, restAfter, entryDone, elapsedSeconds, formatDuration, buildAdHocEntry,
 } from '../workout.js';
 
 export const title = '';
@@ -50,7 +50,11 @@ export async function render(container, { extraEl, titleEl }) {
   const prior = [...done, ...manualAsWorkouts(manual, exercises)];
   const ctx = {
     save, saveLater, exercises, prior, priorRecords: computeRecords(prior),
-    draw: () => container.replaceChildren(...screen(workout, ctx)),
+    progress: progressBar(),
+    draw: () => {
+      container.replaceChildren(...screen(workout, ctx), ...(workout.exercises.length ? [ctx.progress.root] : []));
+      ctx.progress.update(workout);
+    },
     // karta odjede, změní se pozice a nová přijede z druhé strany
     move: async (dir, mutate) => {
       const card = container.querySelector('.card-current');
@@ -133,6 +137,14 @@ function currentCard(workout, cur, ctx) {
       el('span', { class: 'ex-image-label', text: 'Podrobnosti' }),
     ]),
     el('div', { class: 'ex-meta' }, [
+      el('button', {
+        type: 'button', class: 'btn btn-small btn-skip', text: 'Přeskočit cvik ⤼',
+        onclick: () => {
+          entry.skipped = true;
+          toast(`${entry.name} přeskočen`);
+          ctx.move(1, () => { workout.cursor = nextUndone(workout, { ex: workout.cursor.ex, slot: 999 }); });
+        },
+      }),
       metaRow(entry.last ? `Minule ${dateShort.format(new Date(entry.last.date))}` : 'Minule', entry.last ? formatValues(entry, entry.last.values) : 'poprvé'),
       metaRow(entry.goal?.applied ? 'Doporučení podle cíle' : 'Doporučení', rec ? formatValues(entry, [rec]) : '–'),
     ]),
@@ -210,7 +222,7 @@ function currentCard(workout, cur, ctx) {
     oninput: (e) => { entry.note = e.target.value; ctx.saveLater(); },
   });
   note.value = entry.note ?? '';
-  const choices = [['more', 'Přidat'], ['keep', 'Nechat'], ['less', 'Snížit']];
+  const choices = [['less', 'Snížit'], ['keep', 'Nechat'], ['more', 'Přidat']];
   const seg = el('div', { class: 'segmented', role: 'group', 'aria-label': 'Na příště' },
     choices.map(([value, text]) => el('button', {
       type: 'button', class: `seg ${(entry.next ?? 'keep') === value ? 'is-selected' : ''}`, text,
@@ -225,10 +237,10 @@ function currentCard(workout, cur, ctx) {
     el('div', { class: 'note-next' }, [el('span', { class: 'muted small', text: 'Na příště' }), seg]),
   ]));
 
-  // přejetí prstem: doleva další série, doprava předchozí (bez potvrzení)
+  // přejetí prstem: doleva další cvik, doprava předchozí (bez potvrzení)
   onSwipe(card, {
-    left: () => { const n = nextInOrder(workout, workout.cursor); if (n) ctx.move(1, () => { workout.cursor = n; }); },
-    right: () => { if (prev) ctx.move(-1, () => { workout.cursor = prev; }); },
+    left: () => { const n = adjacentExercise(workout, workout.cursor, 1); if (n) ctx.move(1, () => { workout.cursor = n; }); },
+    right: () => { const p = adjacentExercise(workout, workout.cursor, -1); if (p) ctx.move(-1, () => { workout.cursor = p; }); },
   });
 
   return card;
@@ -341,10 +353,10 @@ async function exerciseListSheet(workout, ctx) {
           dragHandle(),
           el('button', {
             type: 'button', class: 'list-main',
-            onclick: () => { workout.cursor = { ex: i, slot: firstUndoneIn(entry) }; ctx.save(); close(); ctx.draw(); },
+            onclick: () => { entry.skipped = false; workout.cursor = { ex: i, slot: firstUndoneIn(entry) }; ctx.save(); close(); ctx.draw(); },
           }, [
             el('span', { class: 'block', text: entry.name }),
-            el('span', { class: `muted small block ${doneCount === slots.length ? 'is-done' : ''}`, text: `${doneCount}/${slots.length} hotovo${isCurrent ? ' · právě cvičím' : ''}` }),
+            el('span', { class: `muted small block ${doneCount === slots.length ? 'is-done' : ''}`, text: entry.skipped ? 'přeskočeno · klepnutím vrátíš' : `${doneCount}/${slots.length} hotovo${isCurrent ? ' · právě cvičím' : ''}` }),
           ]),
           el('button', { type: 'button', class: 'btn btn-small', text: 'Nahradit', onclick: () => replace(i) }),
           el('button', { type: 'button', class: 'btn btn-small btn-icon', html: '&times;', 'aria-label': 'Odebrat', onclick: () => removeAt(i) }),
@@ -405,4 +417,37 @@ async function exerciseListSheet(workout, ctx) {
     draw();
     return body;
   });
+}
+
+// ---------- Ukazatel postupu (jako kapitoly na YouTube) ----------
+// Cviky jsou oddělené větší mezerou s čárkou, série menší mezerou.
+// Hotové série se plynule vyplní rudou.
+function progressBar() {
+  const root = el('div', { class: 'wprog', role: 'progressbar', 'aria-label': 'Postup tréninku', 'aria-valuemin': 0, 'aria-valuemax': 100 });
+  let signature = '';
+  let slotEls = [];
+  return {
+    root,
+    update(workout) {
+      const sig = workout.exercises.map((e) => `${e.uid}:${slotsOf(e).length}`).join('|');
+      if (sig !== signature) {
+        signature = sig;
+        slotEls = workout.exercises.map((entry) => slotsOf(entry).map(() => el('div', { class: 'wprog-slot' }, [el('div', { class: 'wprog-fill' })])));
+        root.replaceChildren(...slotEls.map((slots, i) => el('div', { class: 'wprog-ex', style: `flex-grow: ${slots.length}` }, slots)));
+      }
+      let done = 0;
+      let total = 0;
+      workout.exercises.forEach((entry, i) => {
+        root.children[i].classList.toggle('is-skipped', Boolean(entry.skipped));
+        slotsOf(entry).forEach((slot, k) => {
+          total++;
+          if (slot.done) done++;
+          const node = slotEls[i][k];
+          node.classList.toggle('is-done', slot.done);
+          node.classList.toggle('is-current', workout.cursor?.ex === i && workout.cursor?.slot === k);
+        });
+      });
+      root.setAttribute('aria-valuenow', total ? Math.round((done / total) * 100) : 0);
+    },
+  };
 }

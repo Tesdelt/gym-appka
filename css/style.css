@@ -9,6 +9,7 @@
   --text: #ECEAE6;
   --text-2: #8E8B87;
   --on-accent: #ECEAE6;
+  --tab-active: #D33A4E;
 
   --font-head: "Big Shoulders Display", "Barlow Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
   --font-body: "Barlow", -apple-system, "Helvetica Neue", Arial, sans-serif;
@@ -22,6 +23,7 @@
 }
 
 :root[data-theme="light"] {
+  --tab-active: #A11A2C;
   --bg: #EFEDE9;
   --surface: #FFFFFF;
   --border: #D3CFC9;
@@ -189,7 +191,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* ---------- Spodní navigace ---------- */
 .tabbar {
   flex: none;
+  position: relative;
+  z-index: 3;
   display: flex;
+  align-items: stretch;
+  overflow: visible;
   background: var(--surface);
   border-top: 1px solid var(--border);
   padding-bottom: var(--safe-bottom);
@@ -204,14 +210,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
   align-items: center;
   justify-content: center;
   gap: 3px;
-  padding: 6px 2px;
+  margin: 4px 2px;
+  padding: 4px 2px;
   color: var(--text-2);
   text-decoration: none;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  border-top: 2px solid transparent;
-  margin-top: -1px;
+  border: 1px solid transparent;
 }
 
 .tab svg {
@@ -224,10 +230,29 @@ button, input, select, textarea { font: inherit; color: inherit; }
   stroke-linejoin: miter;
 }
 
+/* aktivní záložka: ikona i nápis rudě, jemný rudý obrys a podklad */
 .tab.is-active {
-  color: var(--text);
-  border-top-color: var(--accent);
+  color: var(--tab-active);
+  border-color: rgba(194, 52, 71, 0.55);
+  background: rgba(194, 52, 71, 0.10);
 }
+
+/* prostřední kulaté tlačítko Trénink, vyčnívá z lišty */
+.tab-center { position: relative; flex: 1.15 1 0; padding-top: 0; justify-content: flex-end; border-color: transparent !important; background: none !important; }
+.tab-center-circle {
+  display: flex; align-items: center; justify-content: center;
+  width: 58px; height: 58px; margin-top: -26px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--tab-active);
+  color: var(--tab-active);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.35);
+  transition: background-color 200ms, color 200ms, transform 200ms;
+}
+.tab-center-circle svg { width: 30px; height: 30px; stroke-width: 2; }
+.tab-center.is-active { color: var(--tab-active); }
+.tab-center.is-active .tab-center-circle { background: var(--accent); border-color: #C23447; color: #ECEAE6; transform: translateY(-1px); }
+.tab-center.is-active svg { transform: none; }
 
 /* ---------- Seznamy ---------- */
 .list { list-style: none; margin: 0 0 12px; padding: 0; }
@@ -613,7 +638,7 @@ input[type="date"].input { min-height: var(--tap); line-height: var(--tap); }
 .btn:active, .choice:active, .ex-card-btn:active { transform: scale(0.97); }
 .seg:active, .tab:active { transform: scale(0.94); }
 .tab svg { transition: transform 200ms var(--ease-out); }
-.tab.is-active svg { transform: translateY(-1px) scale(1.08); }
+.tab.is-active:not(.tab-center) svg { transform: scale(1.06); }
 .tab { transition: color 200ms, border-color 200ms; }
 .stepper-value { overflow: hidden; }
 
@@ -703,3 +728,19 @@ input[type="date"].input { min-height: var(--tap); line-height: var(--tap); }
   }
   .fx-flash { animation: fx-fade-out 600ms ease-out forwards !important; }
 }
+
+/* ---------- Přeskočení cviku ---------- */
+.btn-skip { order: 3; align-self: flex-start; min-height: 32px; padding: 0 10px; font-size: 13px; color: var(--text-2); }
+
+/* ---------- Ukazatel postupu tréninku ---------- */
+.wprog { flex: none; display: flex; align-items: center; gap: 0; height: 14px; margin-top: 2px; }
+.wprog-ex { display: flex; align-items: center; gap: 2px; flex-basis: 0; min-width: 0; height: 100%; }
+.wprog-ex + .wprog-ex { border-left: 2px solid var(--text-2); margin-left: 4px; padding-left: 4px; }
+.wprog-slot { position: relative; flex: 1 1 0; height: 5px; background: var(--border); overflow: hidden; transition: height 200ms var(--ease-out); }
+.wprog-fill { position: absolute; inset: 0; background: #C23447; transform: scaleX(0); transform-origin: left; transition: transform 420ms var(--ease-out); }
+.wprog-slot.is-done .wprog-fill { transform: scaleX(1); }
+.wprog-slot.is-current { height: 9px; background: var(--text-2); }
+.wprog-ex.is-skipped .wprog-slot { background: repeating-linear-gradient(90deg, var(--border) 0 3px, transparent 3px 6px); }
+/* místo pro vyčnívající kulaté tlačítko Trénink */
+.view { padding-bottom: calc(var(--gutter) + 22px); }
+.view-workout { padding-bottom: 28px; }
