@@ -1,6 +1,6 @@
 import { addRoute, startRouter } from './router.js';
 import { openDB, requestPersistentStorage } from './db.js';
-import { seedIfEmpty, translateDbExercises } from './seed.js';
+import { seedIfEmpty, translateDbExercises, upgradeExerciseData } from './seed.js';
 import { applyTheme } from './theme.js';
 import { transition } from './fx.js';
 import * as home from './views/home.js';
@@ -35,6 +35,8 @@ async function init() {
   try {
     await openDB();
     await seedIfEmpty();
+    await translateDbExercises().catch((err) => console.error(err));
+    await upgradeExerciseData().catch((err) => console.error(err));
   } catch (err) {
     console.error('Databáze se nepodařila otevřít', err);
     viewEl.innerHTML = `<section class="card"><h2 class="card-title">Chyba úložiště</h2>
@@ -43,7 +45,6 @@ async function init() {
   }
   // Nečekáme na výsledek, jen požádáme (iOS rozhodne samo).
   requestPersistentStorage();
-  translateDbExercises().catch((err) => console.error(err));
 
   const TAB_ORDER = ['statistiky', 'cile', 'domu', 'cviky', 'nastaveni'];
   let prev = null;

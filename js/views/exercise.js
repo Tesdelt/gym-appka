@@ -3,23 +3,24 @@
 // Trasy: #/cvik/<id>            detail
 //        #/cvik/<id>/upravit    úprava
 //        #/cvik/novy            nový vlastní cvik
-//        #/cvik/novy/db/<dbId>  nový cvik z databáze free-exercise-db
+//        #/cvik/db/<dbId>       cvik z katalogu (náhled a přidání mezi moje cviky)
 
 import {
   getExercise, saveExercise, newExerciseId, templatesUsing, deleteExercise, listGyms, listTemplates, getLastGymId,
   EXERCISE_TYPE_LABEL, EQUIPMENT_LABEL,
 } from '../data.js';
-import { el, toast, confirmDialog, formatValues, formatWeight, dateShort } from '../ui.js';
+import { el, toast, confirmDialog, openDialog, formatValues, formatWeight, dateShort } from '../ui.js';
 import { navigate } from '../router.js';
 import { listDoneWorkouts, buildEntry } from '../workout.js';
 import { listGoals } from '../goals.js';
 import { computeRecords, recordKey } from '../records.js';
 import { rangeChart } from '../chart.js';
 import { listManualRecords, manualAsWorkouts, exercisePoints, exerciseFormat, exerciseChartTitle } from '../stats.js';
-import {
-  imageBox, pickPhoto, deleteImage, fetchDbExercise, downloadDbImages, loadDbIndex, czechInstructions, MUSCLE_CS, EQUIPMENT_FROM_DB,
-} from '../images.js';
+import { imageBox, pickPhoto, deleteImage, EQUIPMENT_FROM_DB } from '../images.js';
 import { DEFAULT_WEIGHT_STEP } from '../seed.js';
+import { loadCatalog, dbName, dbInstructions, thumbUrl, addFromCatalog } from '../catalog.js';
+import { MUSCLE_GROUPS, partLabel } from '../muscles.js';
+import { lang, exName, exText } from '../i18n.js';
 
 export const title = 'Cvik';
 export const tab = 'cviky';
@@ -27,11 +28,14 @@ export const tab = 'cviky';
 export async function render(container, { params, extraEl, titleEl }) {
   extraEl.append(el('button', { type: 'button', class: 'btn btn-small', text: '← Zpět', onclick: goBack }));
 
+  if (params[0] === 'db' || (params[0] === 'novy' && params[1] === 'db')) {
+    titleEl.textContent = 'Katalog';
+    await renderCatalogItem(container, params[0] === 'db' ? params[1] : params[2]);
+    return;
+  }
   if (params[0] === 'novy') {
     titleEl.textContent = 'Nový cvik';
-    const draft = params[1] === 'db' ? await draftFromDb(params[2]) : emptyDraft();
-    if (!draft) { container.append(el('p', { class: 'muted', text: 'Cvik se nepodařilo načíst.' })); return; }
-    renderForm(container, draft, { isNew: true, dbId: params[1] === 'db' ? params[2] : null });
+    renderForm(container, emptyDraft(), { isNew: true });
     return;
   }
 
@@ -69,7 +73,7 @@ async function renderDetail(container, exercise) {
   stack.append(el('section', { class: 'card ex-detail-head' }, [
     pic,
     el('div', { class: 'ex-detail-title' }, [
-      el('h2', { class: 'ex-name', text: exercise.name }),
+      el('h2', { class: 'ex-name', text: exName(exercise) }),
       exercise.aliases?.length ? el('p', { class: 'muted small', text: exercise.aliases.join(', ') }) : null,
       el('p', { class: 'muted small', text: [
         EXERCISE_TYPE_LABEL[exercise.type],
@@ -112,8 +116,8 @@ async function renderDetail(container, exercise) {
     stack.append(el('section', { class: 'card' }, [
       el('h3', { class: 'card-title', text: 'Partie' }),
       el('dl', { class: 'kv' }, [
-        primary.length ? kv('Hlavní', primary.join(', ')) : null,
-        secondary.length ? kv('Vedlejší', secondary.join(', ')) : null,
+        primary.length ? kv('Hlavní', primary.map((k) => partLabel(k, lang)).join(', ')) : null,
+        secondary.length ? kv('Vedlejší', secondary.map((k) => partLabel(k, lang)).join(', ')) : null,
       ]),
     ]));
   }
@@ -147,11 +151,11 @@ async function renderDetail(container, exercise) {
   drawProgress();
 
   // Postup a tipy
-  if (exercise.instructions) {
-    stack.append(el('section', { class: 'card' }, [el('h3', { class: 'card-title', text: 'Postup' }), el('p', { class: 'prose', text: exercise.instructions })]));
+  if (exText(exercise, 'instructions')) {
+    stack.append(el('section', { class: 'card' }, [el('h3', { class: 'card-title', text: 'Postup' }), el('p', { class: 'prose', text: exText(exercise, 'instructions') })]));
   }
-  if (exercise.tips) {
-    stack.append(el('section', { class: 'card' }, [el('h3', { class: 'card-title', text: 'Tipy' }), el('p', { class: 'prose', text: exercise.tips })]));
+  if (exText(exercise, 'tips')) {
+    stack.append(el('section', { class: 'card' }, [el('h3', { class: 'card-title', text: 'Tipy' }), el('p', { class: 'prose', text: exText(exercise, 'tips') })]));
   }
 
   // Akce
@@ -204,35 +208,7 @@ function emptyDraft() {
   };
 }
 
-async function draftFromDb(dbId) {
-  const index = await loadDbIndex().catch(() => null);
-  const meta = index?.find((e) => e.id === dbId);
-  if (!meta) return null;
-  const equipment = EQUIPMENT_FROM_DB[meta.eq] ?? 'other';
-  const draft = {
-    ...emptyDraft(),
-    name: meta.nc ?? meta.n,
-    aliases: [meta.n],
-    bodyweight: meta.eq === 'body only',
-    equipment,
-    perGym: equipment === 'cable',
-    muscles: { primary: meta.p.map((m) => MUSCLE_CS[m] ?? m), secondary: meta.s.map((m) => MUSCLE_CS[m] ?? m) },
-    source: 'free-exercise-db',
-    dbId,
-  };
-  draft.instructions = await czechInstructions(dbId);
-  if (!draft.instructions) {
-    try {
-      const full = await fetchDbExercise(dbId);
-      draft.instructions = (full.instructions ?? []).join('\n');
-    } catch {
-      draft.instructions = ''; // bez internetu zůstane prázdný
-    }
-  }
-  return draft;
-}
-
-async function renderForm(container, draft, { isNew, dbId = null }) {
+async function renderForm(container, draft, { isNew }) {
   const gyms = await listGyms();
   const fmt = (v) => new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2, useGrouping: false }).format(v);
   const parseNum = (v) => parseFloat(String(v).replace(',', '.'));
@@ -249,7 +225,9 @@ async function renderForm(container, draft, { isNew, dbId = null }) {
     return { input, root: el('label', { class: 'check-row' }, [input, el('span', { text: label })]) };
   };
 
-  const name = text(draft.name, dbId ? 'Český název' : 'Název cviku');
+  // texty se upravují v aktuálním jazyce appky (druhý jazyk zůstane)
+  const nameKey = lang === 'en' && !isNew ? 'nameEn' : 'name';
+  const name = text(exName(draft), 'Název cviku');
   const aliases = text(draft.aliases.join(', '), 'např. shyby, pull-up');
   const type = select(draft.type, EXERCISE_TYPE_LABEL);
   const bodyweight = check(draft.bodyweight, 'S vlastní vahou (zadává se přidaná váha, 0 = jen tělo, záporná = guma)');
@@ -264,10 +242,22 @@ async function renderForm(container, draft, { isNew, dbId = null }) {
     el('span', { class: 'field-label', text: 'Krok váhy podle posilovny (kg)' }),
     ...gymStepInputs.map(({ gym, input }) => el('div', { class: 'gym-step-row' }, [el('span', { text: gym.name }), input])),
   ]);
-  const primary = text(draft.muscles.primary.join(', '), 'např. biceps, předloktí');
-  const secondary = text(draft.muscles.secondary.join(', '));
-  const instructions = area(draft.instructions, 'Jak cvik provádět');
-  const tips = area(draft.tips, 'Na co si dát pozor');
+  const muscles = { primary: [...(draft.muscles?.primary ?? [])], secondary: [...(draft.muscles?.secondary ?? [])] };
+  const muscleField = (key, label) => {
+    const btn = el('button', { type: 'button', class: 'input muscle-btn' });
+    const refresh = () => { btn.textContent = muscles[key].length ? muscles[key].map((k) => partLabel(k, lang)).join(', ') : 'Vybrat…'; };
+    btn.addEventListener('click', async () => {
+      const other = key === 'primary' ? muscles.secondary : muscles.primary;
+      const picked = await pickMuscles(label, muscles[key], other);
+      if (picked) { muscles[key] = picked; refresh(); }
+    });
+    refresh();
+    return btn;
+  };
+  const primary = muscleField('primary', 'Hlavní partie');
+  const secondary = muscleField('secondary', 'Vedlejší partie');
+  const instructions = area(exText(draft, 'instructions'), 'Jak cvik provádět');
+  const tips = area(exText(draft, 'tips'), 'Na co si dát pozor');
 
   const sync = () => {
     const isWeight = type.value === 'weight';
@@ -290,7 +280,7 @@ async function renderForm(container, draft, { isNew, dbId = null }) {
       const n = name.value.trim();
       if (!n) { toast('Vyplň název'); name.focus(); return; }
       const ex = { ...draft };
-      ex.name = n;
+      ex[nameKey] = n;
       ex.aliases = list(aliases.value);
       ex.type = type.value;
       ex.bodyweight = ex.type === 'weight' && bodyweight.input.checked;
@@ -303,23 +293,13 @@ async function renderForm(container, draft, { isNew, dbId = null }) {
         const v = parseNum(input.value);
         if (Number.isFinite(v) && v > 0) ex.gymSteps[gym.id] = v;
       }
-      ex.muscles = { primary: list(primary.value), secondary: list(secondary.value) };
-      ex.instructions = instructions.value.trim();
-      ex.tips = tips.value.trim();
+      ex.muscles = muscles;
+      const suffix = nameKey === 'nameEn' ? 'En' : '';
+      ex[`instructions${suffix}`] = instructions.value.trim();
+      ex[`tips${suffix}`] = tips.value.trim();
       if (isNew) {
         ex.id = newExerciseId(n);
         ex.createdAt = new Date().toISOString();
-        if (dbId) {
-          saveBtn.disabled = true;
-          saveBtn.textContent = 'Stahuji obrázky…';
-          const count = (await loadDbIndex().catch(() => []))?.find((e) => e.id === dbId)?.i ?? 2;
-          try {
-            ex.images = await downloadDbImages(dbId, count);
-          } catch {
-            ex.images = [];
-          }
-          if (!ex.images.length) toast('Obrázky se nepodařilo stáhnout, cvik je bez obrázku');
-        }
       }
       await saveExercise(ex);
       toast(isNew ? 'Cvik přidán' : 'Uloženo');
@@ -330,7 +310,6 @@ async function renderForm(container, draft, { isNew, dbId = null }) {
   });
 
   container.append(el('div', { class: 'stack form' }, [
-    dbId ? el('p', { class: 'muted small', text: 'Cvik z databáze free-exercise-db, přeložený do češtiny. Název i postup můžeš upravit. Obrázky se stáhnou při uložení.' }) : null,
     el('section', { class: 'card stack' }, [
       field('Název', name),
       field('Přezdívky', aliases, 'Oddělené čárkou. Podle nich cvik najdeš ve vyhledávání.'),
@@ -342,7 +321,7 @@ async function renderForm(container, draft, { isNew, dbId = null }) {
       gymSteps,
     ]),
     el('section', { class: 'card stack' }, [
-      field('Hlavní partie', primary, 'Oddělené čárkou.'),
+      field('Hlavní partie', primary, 'Na co cvik cíleně míří (izolovaný filtr v katalogu).'),
       field('Vedlejší partie', secondary),
       field('Postup', instructions),
       field('Tipy', tips),
@@ -350,4 +329,88 @@ async function renderForm(container, draft, { isNew, dbId = null }) {
     saveBtn,
   ]));
   sync();
+}
+
+// Výběr svalů: skupiny s podrobnými svaly na zaškrtnutí.
+// Svaly vybrané v druhém poli (hlavní/vedlejší) nejdou vybrat znovu.
+function pickMuscles(title, selected, taken) {
+  const chosen = new Set(selected);
+  const blocked = new Set(taken);
+  return openDialog((close) => el('div', { class: 'dialog-body filter-panel' }, [
+    el('h2', { class: 'dialog-title', text: title }),
+    el('div', { class: 'filter-list' }, MUSCLE_GROUPS.map((g) => el('div', { class: 'filter-group is-open' }, [
+      el('div', { class: 'muscle-group-title', text: g[lang] }),
+      el('div', { class: 'filter-parts' }, g.parts.map((p) => {
+        const input = el('input', { type: 'checkbox', class: 'checkbox', disabled: blocked.has(p.key) ? '' : null });
+        input.checked = chosen.has(p.key);
+        input.addEventListener('change', () => { if (input.checked) chosen.add(p.key); else chosen.delete(p.key); });
+        return el('label', { class: `check-row filter-check ${blocked.has(p.key) ? 'is-disabled' : ''}` }, [input, el('span', { text: p[lang] })]);
+      })),
+    ]))),
+    el('div', { class: 'dialog-actions' }, [
+      el('button', { type: 'button', class: 'btn', text: 'Zrušit', onclick: () => close(null) }),
+      el('button', { type: 'button', class: 'btn btn-primary', text: 'Použít', onclick: () => close([...chosen]) }),
+    ]),
+  ]));
+}
+
+// ---------- Cvik z katalogu ----------
+async function renderCatalogItem(container, dbId) {
+  const catalog = await loadCatalog().catch(() => []);
+  const meta = catalog.find((m) => m.id === dbId);
+  if (!meta) { container.append(el('p', { class: 'muted', text: 'Cvik nenalezen.' })); return; }
+  const mine = (await (await import('../data.js')).listExercises()).find((e) => e.dbId === dbId);
+  if (mine) { location.replace(`#/cvik/${encodeURIComponent(mine.id)}`); return; }
+
+  const stack = el('div', { class: 'stack' });
+  container.append(stack);
+
+  // fotky: plné z internetu, jinak náhled z appky
+  const hero = el('div', { class: 'ex-hero is-toggle' });
+  hero.style.viewTransitionName = 'ex-image';
+  const img = el('img', { alt: '', src: thumbUrl(meta) ?? '' });
+  hero.append(img);
+  const first = meta.t === 'time' && meta.i > 1 ? 1 : 0;
+  const frames = Array.from({ length: meta.i || 0 }, (_, i) => i).filter((i) => i >= first);
+  let frame = 0;
+  const full = (i) => `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${encodeURIComponent(dbId)}/${i}.jpg`;
+  if (frames.length) {
+    const pre = new Image();
+    pre.onload = () => { img.src = pre.src; };
+    pre.src = full(frames[0]);
+    if (frames.length > 1) hero.addEventListener('click', () => { frame = (frame + 1) % frames.length; img.src = full(frames[frame]); });
+    else hero.classList.remove('is-toggle');
+  }
+
+  const equipment = EQUIPMENT_FROM_DB[meta.eq] ?? 'other';
+  const addBtn = el('button', {
+    type: 'button', class: 'btn btn-primary btn-hero', text: 'Přidat mezi moje cviky',
+    onclick: async () => {
+      addBtn.disabled = true;
+      addBtn.textContent = 'Přidávám…';
+      const ex = await addFromCatalog(meta);
+      toast(ex.images.length ? 'Cvik přidán' : 'Cvik přidán (fotky se stáhnou, až bude internet)');
+      location.replace(`#/cvik/${encodeURIComponent(ex.id)}`);
+    },
+  });
+
+  stack.append(
+    el('section', { class: 'card ex-detail-head' }, [
+      hero,
+      el('div', { class: 'ex-detail-title' }, [
+        el('h2', { class: 'ex-name', text: dbName(meta) }),
+        el('p', { class: 'muted small', text: [lang === 'en' ? meta.nc : meta.n, EXERCISE_TYPE_LABEL[meta.t], EQUIPMENT_LABEL[equipment]].filter(Boolean).join(' · ') }),
+      ]),
+    ]),
+    addBtn,
+    el('section', { class: 'card' }, [
+      el('h3', { class: 'card-title', text: 'Partie' }),
+      el('dl', { class: 'kv' }, [
+        kv('Hlavní', meta.p.map((k) => partLabel(k, lang)).join(', ')),
+        meta.s.length ? kv('Vedlejší', meta.s.map((k) => partLabel(k, lang)).join(', ')) : null,
+      ]),
+    ]),
+  );
+  const instructions = await dbInstructions(dbId);
+  if (instructions) stack.append(el('section', { class: 'card' }, [el('h3', { class: 'card-title', text: 'Postup' }), el('p', { class: 'prose', text: instructions })]));
 }

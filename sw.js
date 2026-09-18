@@ -1,6 +1,6 @@
 // Service worker: offline cache. Při každém nasazení zvýšit VERSION
 // a nové soubory doplnit do ASSETS.
-const VERSION = '0.9.8';
+const VERSION = '0.10.0';
 const CACHE = `gym-app-v${VERSION}`;
 
 const ASSETS = [
@@ -28,8 +28,13 @@ const ASSETS = [
   'js/theme.js',
   'js/backup.js',
   'js/fx.js',
+  'js/i18n.js',
+  'js/i18n-en.js',
+  'js/muscles.js',
+  'js/catalog.js',
   'data/free-exercise-db.json',
   'data/free-exercise-db-cs.json',
+  'data/free-exercise-db-en.json',
   'js/views/home.js',
   'js/views/stats.js',
   'js/views/goals.js',
@@ -100,7 +105,10 @@ self.addEventListener('fetch', (event) => {
     const cached = await cache.match(request, { ignoreSearch: true });
     if (cached) return cached;
     try {
-      return await fetch(request);
+      const response = await fetch(request);
+      // náhledy katalogu se ukládají průběžně, jak je uživatel prohlíží
+      if (response.ok && new URL(request.url).pathname.includes('/img/db/')) cache.put(request, response.clone());
+      return response;
     } catch (err) {
       if (request.mode === 'navigate') {
         const shell = await cache.match('index.html');

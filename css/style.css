@@ -850,3 +850,42 @@ input[type="date"].input { min-height: var(--tap); line-height: var(--tap); }
 }
 @media (prefers-reduced-motion: reduce) { .fx-wave-ring { display: none; } }
 
+
+/* ---------- Katalog cviků ---------- */
+.cat-top { position: sticky; top: calc(-1 * var(--gutter)); z-index: 3; margin: calc(-1 * var(--gutter)) calc(-1 * var(--gutter)) 12px; padding: var(--gutter) var(--gutter) 8px; background: var(--bg); border-bottom: 1px solid var(--border); }
+.cat-search { display: flex; gap: 8px; }
+.cat-search .search-input { flex: 1 1 auto; position: static; }
+.filter-btn { flex: none; }
+.filter-btn.is-active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.filter-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.filter-chips:not(:empty) { margin-top: 8px; }
+.filter-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 10px; border: 1px solid var(--accent); background: rgba(122, 28, 42, 0.25); color: var(--text); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.filter-chip.is-part { border-style: dashed; }
+.filter-chip-x { color: var(--text-2); font-size: 16px; }
+.cat-section + .cat-section { margin-top: 20px; }
+.cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.cat-card { display: flex; flex-direction: column; min-width: 0; padding: 0; border: 1px solid var(--border); background: var(--surface); color: var(--text); text-align: left; cursor: pointer; }
+.cat-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.5em; padding: 5px 6px 4px; font-size: 13px; font-weight: 600; line-height: 1.25; }
+.cat-pic { position: relative; width: 100%; aspect-ratio: 1 / 1; overflow: hidden; background: #fff; color: var(--border); display: flex; align-items: center; justify-content: center; }
+.cat-pic.is-empty { background: var(--bg); }
+.cat-pic img { width: 100%; height: 100%; object-fit: cover; object-position: center 30%; display: block; }
+.cat-pic svg { width: 40%; height: 40%; }
+.cat-sentinel { height: 1px; }
+
+/* panel filtrů */
+.filter-panel { max-height: 80vh; display: flex; flex-direction: column; }
+.filter-list { overflow-y: auto; margin: 8px -4px 0; padding: 0 4px; }
+.filter-group { border-top: 1px solid var(--border); }
+.filter-group:first-child { border-top: 0; }
+.filter-row { display: flex; align-items: center; }
+.filter-row .filter-check { flex: 1 1 auto; }
+.filter-check { font-size: 16px; font-weight: 600; align-items: center; }
+.filter-parts { padding: 0 0 6px 28px; }
+.filter-parts .filter-check { font-weight: 500; font-size: 15px; min-height: 40px; }
+.filter-expand { flex: none; display: flex; align-items: center; gap: 6px; min-width: 48px; min-height: 48px; justify-content: flex-end; padding: 0 6px; border: 0; background: none; color: var(--text-2); cursor: pointer; }
+.filter-arrow { font-size: 24px; transition: transform 180ms var(--ease-out); }
+.filter-group.is-open .filter-arrow { transform: rotate(90deg); }
+.filter-count { min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--accent); color: var(--on-accent); font-size: 12px; font-weight: 700; line-height: 20px; text-align: center; }
+.muscle-group-title { padding: 10px 0 2px; font-weight: 700; color: var(--text-2); font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; }
+.check-row.is-disabled { opacity: 0.4; }
+.muscle-btn { text-align: left; cursor: pointer; line-height: 1.3; padding: 10px 12px; min-height: var(--tap); }

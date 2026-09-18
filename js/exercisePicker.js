@@ -3,6 +3,8 @@
 import { el, openDialog } from './ui.js';
 import { listExercises } from './data.js';
 import { imageBox } from './images.js';
+import { partLabel } from './muscles.js';
+import { lang, exName } from './i18n.js';
 
 export function normalize(text) {
   return String(text ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -11,7 +13,7 @@ export function normalize(text) {
 export function matchesExercise(exercise, query) {
   const q = normalize(query).trim();
   if (!q) return true;
-  const hay = [exercise.name, ...(exercise.aliases ?? []), ...(exercise.muscles?.primary ?? []), ...(exercise.muscles?.secondary ?? [])];
+  const hay = [exercise.name, exercise.nameEn, ...(exercise.aliases ?? []), ...[...(exercise.muscles?.primary ?? []), ...(exercise.muscles?.secondary ?? [])].map((k) => partLabel(k, lang))];
   return hay.some((h) => normalize(h).includes(q));
 }
 
@@ -25,7 +27,7 @@ export async function pickExercise({ title = 'Vybrat cvik', exclude = [] } = {})
         el('button', { type: 'button', class: 'list-main picker-row', onclick: () => close(e) }, [
           imageBox(e, { cls: 'ex-thumb ex-thumb-small' }),
           el('span', {}, [
-            el('span', { class: 'block', text: e.name }),
+            el('span', { class: 'block', text: exName(e) }),
             el('span', { class: 'muted small block', text: (e.aliases ?? []).join(', ') }),
           ]),
         ]),
