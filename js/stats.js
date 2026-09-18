@@ -6,7 +6,7 @@
 import { getAll, put, remove, newId } from './db.js';
 import { slotsOf, isClean, isWork } from './recommend.js';
 import { formatWeight } from './ui.js';
-import { t, exName } from './i18n.js';
+import { t, exName, plural } from './i18n.js';
 
 export const EX_RECORD = 'ex-record';
 
@@ -58,14 +58,21 @@ export function exercisePoints(sessions, exercise, gymId) {
       const slots = slotsOf(entry).filter(isClean);
       if (!slots.length) continue;
       let v;
-      if (exercise.type === 'time') v = Math.max(...slots.map((s) => s.seconds ?? 0));
-      else if (exercise.type === 'reps') v = Math.max(...slots.map((s) => s.reps ?? 0));
+      let best;
+      if (exercise.type === 'time') { best = slots.reduce((a, b) => ((b.seconds ?? 0) > (a.seconds ?? 0) ? b : a)); v = best.seconds ?? 0; }
+      else if (exercise.type === 'reps') { best = slots.reduce((a, b) => ((b.reps ?? 0) > (a.reps ?? 0) ? b : a)); v = best.reps ?? 0; }
       else {
         const loaded = slots.filter((s) => (s.reps ?? 0) > 0);
         if (!loaded.length) continue;
-        v = Math.max(...loaded.map((s) => s.weight ?? 0));
+        best = loaded.reduce((a, b) => ((b.weight ?? 0) > (a.weight ?? 0) || ((b.weight ?? 0) === (a.weight ?? 0) && b.reps > a.reps) ? b : a));
+        v = best.weight ?? 0;
       }
-      if (Number.isFinite(v)) points.push({ t: w.startedAt, v, manual: Boolean(w.manual) });
+      // popis pro detail bodu v grafu: nejlepší série a počet sérií
+      const bestText = exercise.type === 'time' ? `${best.seconds} s`
+        : exercise.type === 'reps' ? `${best.reps} ×`
+          : `${formatWeight(best.weight, { bodyweight: exercise.bodyweight })} × ${best.reps}`;
+      const detail = w.manual ? bestText : `${bestText} · ${plural(slots.length, ['série', 'série', 'sérií'], ['set', 'sets'])}`;
+      if (Number.isFinite(v)) points.push({ t: w.startedAt, v, detail, manual: Boolean(w.manual), workoutId: w.manual ? null : w.id });
     }
   }
   if (points.length) {

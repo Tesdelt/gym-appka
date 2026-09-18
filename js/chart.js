@@ -17,7 +17,8 @@ function node(tag, attrs = {}, text = null) {
 const dateFmt = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'numeric' });
 const dateFmtYear = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'numeric', year: '2-digit' });
 
-export function lineChart(points, { format = (v) => String(v), height = 170 } = {}) {
+// onOpen(point): volitelné – u vybraného bodu tlačítko „Otevřít trénink“
+export function lineChart(points, { format = (v) => String(v), height = 170, onOpen = null } = {}) {
   const wrap = document.createElement('div');
   wrap.className = 'chart';
   const data = points
@@ -71,6 +72,45 @@ export function lineChart(points, { format = (v) => String(v), height = 170 } = 
   const last = data[data.length - 1];
   svg.setAttribute('aria-label', t('Graf, poslední hodnota {value}', { value: format(last.v) }));
   wrap.append(svg);
+
+  // Klepnutí do grafu vybere nejbližší bod: pod grafem přesné datum, hodnota
+  // a případně odkaz na celý trénink
+  const guide = node('line', { class: 'chart-guide', y1: pad.t, y2: H - pad.b, visibility: 'hidden' });
+  const mark = node('circle', { class: 'chart-sel', r: 6, visibility: 'hidden' });
+  svg.append(guide, mark);
+  const info = document.createElement('div');
+  info.className = 'chart-info';
+  info.innerHTML = `<span class="muted small">${t('Klepni do grafu pro detail bodu.')}</span>`;
+  wrap.append(info);
+  const longFmt = new Intl.DateTimeFormat(locale, { weekday: 'short', day: 'numeric', month: 'numeric', year: 'numeric' });
+  const select = (p) => {
+    const cx = x(p.t);
+    guide.setAttribute('x1', cx); guide.setAttribute('x2', cx); guide.setAttribute('visibility', 'visible');
+    mark.setAttribute('cx', cx); mark.setAttribute('cy', y(p.v)); mark.setAttribute('visibility', 'visible');
+    mark.classList.toggle('is-gold', Boolean(p.gold));
+    info.replaceChildren();
+    const text = document.createElement('span');
+    text.className = 'chart-info-text';
+    text.innerHTML = `<strong></strong> <span class="muted"></span>`;
+    text.firstElementChild.textContent = (p.detail ?? format(p.v)) + (p.gold ? ' ★' : '');
+    text.lastElementChild.textContent = `· ${longFmt.format(p.t)}${p.manual ? ` · ${t('ruční záznam')}` : ''}`;
+    info.append(text);
+    if (onOpen && p.workoutId) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-small';
+      btn.textContent = t('Otevřít trénink ›');
+      btn.addEventListener('click', () => onOpen(p));
+      info.append(btn);
+    }
+  };
+  svg.style.cursor = 'pointer';
+  svg.addEventListener('click', (e) => {
+    const r = svg.getBoundingClientRect();
+    const px = ((e.clientX - r.left) / r.width) * W;
+    const nearest = data.reduce((a, b) => (Math.abs(x(b.t) - px) < Math.abs(x(a.t) - px) ? b : a));
+    select(nearest);
+  });
   return wrap;
 }
 

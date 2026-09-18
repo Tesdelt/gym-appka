@@ -356,7 +356,7 @@ async function renderExercise(container, id, titleEl) {
           rec?.maxWeight ? el('div', { class: 'kv-row' }, [el('dt', { text: t('Dosaženo') }), el('dd', { text: dateShort.format(new Date(rec.maxWeight.date)) })]) : null,
         ]),
         el('h4', { class: 'sub-title', text: exerciseChartTitle(exercise) }),
-        rangeChart(points, { format: exerciseFormat(exercise) }),
+        rangeChart(points, { format: exerciseFormat(exercise), onOpen: (p) => navigate(`souhrn/${encodeURIComponent(p.workoutId)}`) }),
         myManual.length ? el('p', { class: 'muted small', text: t('Duté body jsou ruční záznamy.') }) : null,
       ]),
       atWeight.length ? el('section', { class: 'card' }, [

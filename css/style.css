@@ -1039,3 +1039,11 @@ input[type="date"].input { min-height: var(--tap); line-height: var(--tap); }
 .actionbar:empty { display: none; }
 .actionbar .btn { flex: 1 1 0; min-width: 0; min-height: 48px; }
 .actionbar .btn-primary { flex-grow: 1.6; }
+
+/* ---------- Detail bodu v grafu ---------- */
+.chart-guide { stroke: var(--text-2); stroke-width: 1; stroke-dasharray: 3 3; }
+.chart-sel { fill: none; stroke: var(--text); stroke-width: 2; }
+.chart-sel.is-gold { stroke: var(--gold); }
+.chart-info { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 40px; margin-top: 4px; }
+.chart-info-text { font-size: 14px; }
+.chart-info .btn { flex: none; }

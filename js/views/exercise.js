@@ -169,7 +169,7 @@ async function renderDetail(container, exercise, extraEl) {
         kv(t('Osobní rekord'), recordText(exercise, rec), true),
       ]),
       el('h4', { class: 'sub-title', text: exerciseChartTitle(exercise) }),
-      rangeChart(points, { format: exerciseFormat(exercise) }),
+      rangeChart(points, { format: exerciseFormat(exercise), onOpen: (p) => navigate(`souhrn/${encodeURIComponent(p.workoutId)}`) }),
       el('button', { type: 'button', class: 'btn btn-small', text: t('Statistiky a ruční záznamy'), onclick: () => navigate(`statistiky/cvik/${encodeURIComponent(exercise.id)}`) }),
     ].filter(Boolean));
   };

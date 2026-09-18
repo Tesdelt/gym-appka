@@ -493,4 +493,7 @@ export const EN = {
   'Kolo přidáno': 'Round added',
   'Série přidána': 'Set added',
   '← Zpět do tréninku': '← Back to workout',
+  'Klepni do grafu pro detail bodu.': 'Tap the chart for point details.',
+  'ruční záznam': 'manual entry',
+  'Otevřít trénink ›': 'Open workout ›',
 };
