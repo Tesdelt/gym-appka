@@ -149,3 +149,40 @@ export async function addMeasurement(kind, value, date = new Date().toISOString(
 export function deleteMeasurement(id) {
   return remove('measurements', id);
 }
+
+// ---------- Úpravy šablon ----------
+export async function saveTemplate(template) {
+  template.updatedAt = new Date().toISOString();
+  await put('templates', template);
+  return template;
+}
+
+export async function addTemplate(name) {
+  const list = await listTemplates();
+  const t = {
+    id: newId(), name, subtitle: '', order: (list[list.length - 1]?.order ?? 0) + 1,
+    exercises: [], createdAt: new Date().toISOString(),
+  };
+  await put('templates', t);
+  return t;
+}
+
+export function deleteTemplate(id) {
+  return remove('templates', id);
+}
+
+// Pořadí šablon (čísla 1., 2., 3. …) podle pole id
+export async function reorderTemplates(ids) {
+  const list = await listTemplates();
+  const byId = new Map(list.map((t) => [t.id, t]));
+  const changed = ids.map((id, i) => ({ ...byId.get(id), order: i + 1 }));
+  await putAll('templates', changed);
+}
+
+// Výchozí položka šablony pro cvik
+export function defaultTemplateItem(exercise) {
+  const set = exercise.type === 'time'
+    ? { weight: 0, seconds: 30, rest: 180 }
+    : { weight: exercise.type === 'reps' ? 0 : 10, reps: 10, rest: 180 };
+  return { exerciseId: exercise.id, mode: 'sets', sets: [{ ...set }, { ...set }, { ...set }], repRange: null, weightStep: null };
+}

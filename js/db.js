@@ -39,6 +39,8 @@ const MIGRATIONS = [
   },
 ];
 
+export const DB_VERSION = MIGRATIONS.length;
+
 let dbPromise = null;
 
 export function openDB() {

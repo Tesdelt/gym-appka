@@ -93,7 +93,7 @@ export function promptNumber({ title, value = 0, step = 'any', min = null, unit 
 
 // Číselné pole s tlačítky +/− a možností ručního zadání (čárka i tečka).
 // Vrací { root, input, value() }.
-export function stepField(label, value, step, min = null) {
+export function stepField(label, value, step, min = null, onChange = null) {
   const fmt = (v) => (v == null || !Number.isFinite(v) ? '' : new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2, useGrouping: false }).format(v));
   const read = () => parseFloat(String(input.value).replace(',', '.').replace(/\s/g, ''));
   const input = el('input', { type: 'text', class: 'input edit-field', inputmode: 'decimal', value: fmt(value), autocomplete: 'off' });
@@ -103,7 +103,16 @@ export function stepField(label, value, step, min = null) {
     v = Math.round((v + d) * 100) / 100;
     if (min != null && v < min) v = min;
     input.value = fmt(v);
+    onChange?.(v);
   };
+  if (onChange) {
+    input.addEventListener('change', () => {
+      let v = read();
+      if (!Number.isFinite(v)) return;
+      if (min != null && v < min) { v = min; input.value = fmt(v); }
+      onChange(v);
+    });
+  }
   const root = el('div', { class: 'edit-row' }, [
     el('span', { class: 'field-label', text: label }),
     el('div', { class: 'stepper-row edit-stepper' }, [
@@ -113,6 +122,73 @@ export function stepField(label, value, step, min = null) {
     ]),
   ]);
   return { root, input, value: read, set: (v) => { input.value = fmt(v); } };
+}
+
+// Řazení seznamu: řádky <li data-index> s úchytem .drag-handle. Řádek se za
+// úchyt táhne prstem nebo myší. Klepnutí na úchyt řádek „vezme“ (zezlátne)
+// a klepnutí na jiný úchyt ho vloží před tento řádek.
+// onReorder(order) dostane nové pořadí původních indexů.
+export function makeSortable(list, onReorder) {
+  let picked = null;
+  const rows = () => [...list.children].filter((r) => r.dataset.index != null);
+  const commit = () => {
+    picked?.classList.remove('is-picked');
+    picked = null;
+    const order = rows().map((r) => Number(r.dataset.index));
+    if (order.some((v, i) => v !== i)) onReorder(order);
+  };
+  const moveTo = (row, clientY) => {
+    const target = rows().filter((r) => r !== row).find((r) => {
+      const b = r.getBoundingClientRect();
+      return clientY < b.top + b.height / 2;
+    });
+    if (target) list.insertBefore(row, target);
+    else list.append(row);
+  };
+  for (const row of rows()) {
+    const handle = row.querySelector('.drag-handle');
+    if (!handle) continue;
+    const tap = () => {
+      if (!picked) { picked = row; row.classList.add('is-picked'); return; }
+      if (picked === row) { row.classList.remove('is-picked'); picked = null; return; }
+      list.insertBefore(picked, row);
+      commit();
+    };
+    handle.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      let moved = false;
+      row.classList.add('is-dragging');
+      const onMove = (ev) => { moved = true; moveTo(row, ev.touches[0].clientY); };
+      const onEnd = () => {
+        handle.removeEventListener('touchmove', onMove);
+        handle.removeEventListener('touchend', onEnd);
+        handle.removeEventListener('touchcancel', onEnd);
+        row.classList.remove('is-dragging');
+        if (moved) commit(); else tap();
+      };
+      handle.addEventListener('touchmove', onMove, { passive: false });
+      handle.addEventListener('touchend', onEnd);
+      handle.addEventListener('touchcancel', onEnd);
+    }, { passive: false });
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      let moved = false;
+      row.classList.add('is-dragging');
+      const onMove = (ev) => { moved = true; moveTo(row, ev.clientY); };
+      const onUp = () => {
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        row.classList.remove('is-dragging');
+        if (moved) commit(); else tap();
+      };
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    });
+  }
+}
+
+export function dragHandle() {
+  return el('span', { class: 'drag-handle', 'aria-label': 'Přesunout', html: '&#8801;' });
 }
 
 // Skloňování: plural(4, ['cvik', 'cviky', 'cviků']) → „4 cviky“

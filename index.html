@@ -17,6 +17,10 @@
   <link rel="icon" type="image/png" href="icons/icon-192.png">
   <meta name="format-detection" content="telephone=no">
 
+  <script>
+    // motiv hned při načtení, ať neproblikne tmavý
+    try { if (localStorage.getItem('gym-theme') === 'light') document.documentElement.dataset.theme = 'light'; } catch (e) {}
+  </script>
   <link rel="stylesheet" href="css/fonts.css">
   <link rel="stylesheet" href="css/style.css">
 </head>

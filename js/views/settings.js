@@ -1,6 +1,13 @@
-import { listGyms, addGym, renameGym, deleteGym, listTemplates, exerciseMap } from '../data.js';
-import { el, promptText, confirmDialog, toast, formatWeight, formatRest } from '../ui.js';
+// Nastavení: vzhled, typy tréninků, posilovny, záloha dat, kontrola instalace.
+
+import {
+  listGyms, addGym, renameGym, deleteGym, listTemplates, addTemplate, reorderTemplates,
+} from '../data.js';
+import { el, promptText, confirmDialog, toast, plural, dragHandle, makeSortable, dateShort } from '../ui.js';
+import { navigate } from '../router.js';
 import { renderDiagnostics } from '../diagnostics.js';
+import { getTheme, setTheme } from '../theme.js';
+import { shareBackup, pickBackupFile, inspectBackup, importData } from '../backup.js';
 
 export const title = 'Nastavení';
 
@@ -8,14 +15,64 @@ export function render(container) {
   const wrap = el('div', { class: 'stack' });
   container.append(wrap);
 
-  const gymsCard = el('section', { class: 'card' });
+  const themeCard = el('section', { class: 'card' });
   const templatesCard = el('section', { class: 'card' });
-  wrap.append(gymsCard, templatesCard);
-  renderGyms(gymsCard);
+  const gymsCard = el('section', { class: 'card' });
+  const backupCard = el('section', { class: 'card' });
+  wrap.append(themeCard, templatesCard, gymsCard, backupCard);
+  renderTheme(themeCard);
   renderTemplates(templatesCard);
+  renderGyms(gymsCard);
+  renderBackup(backupCard);
   renderDiagnostics(wrap);
 }
 
+// ---------- Vzhled ----------
+function renderTheme(card) {
+  const current = getTheme();
+  card.replaceChildren(
+    el('h2', { class: 'card-title', text: 'Vzhled' }),
+    el('div', { class: 'segmented' }, [['dark', 'Tmavý'], ['light', 'Světlý']].map(([key, label]) => el('button', {
+      type: 'button', class: `seg ${current === key ? 'is-selected' : ''}`, text: label,
+      onclick: () => { setTheme(key); renderTheme(card); },
+    }))),
+  );
+}
+
+// ---------- Typy tréninků ----------
+async function renderTemplates(card) {
+  const templates = await listTemplates();
+  const list = el('ul', { class: 'list drag-list' }, templates.map((t, i) => el('li', { class: 'list-row', 'data-index': i }, [
+    dragHandle(),
+    el('button', { type: 'button', class: 'list-main', onclick: () => navigate(`sablona/${encodeURIComponent(t.id)}`) }, [
+      el('span', { class: 'block', text: `${i + 1}. ${t.name}` }),
+      el('span', { class: 'muted small block', text: [
+        t.subtitle,
+        t.exercises.length ? plural(t.exercises.length, ['cvik', 'cviky', 'cviků']) : 'bez cviků',
+      ].filter(Boolean).join(' · ') }),
+    ]),
+    el('span', { class: 'chevron', 'aria-hidden': 'true', text: '›' }),
+  ])));
+  makeSortable(list, async (order) => {
+    await reorderTemplates(order.map((i) => templates[i].id));
+    renderTemplates(card);
+  });
+  card.replaceChildren(
+    el('h2', { class: 'card-title', text: 'Typy tréninků' }),
+    list,
+    el('button', {
+      type: 'button', class: 'btn', text: '+ Přidat typ tréninku',
+      onclick: async () => {
+        const name = await promptText({ title: 'Nový typ tréninku', placeholder: 'např. Nohy', okLabel: 'Přidat' });
+        if (!name) return;
+        const t = await addTemplate(name);
+        navigate(`sablona/${encodeURIComponent(t.id)}`);
+      },
+    }),
+  );
+}
+
+// ---------- Posilovny ----------
 async function renderGyms(card) {
   const gyms = await listGyms();
   card.replaceChildren(
@@ -41,6 +98,7 @@ async function renderGyms(card) {
         },
       }),
     ]))),
+    el('p', { class: 'muted small', text: 'Klepnutím na název posilovnu přejmenuješ.' }),
     el('button', {
       type: 'button', class: 'btn', text: '+ Přidat posilovnu',
       onclick: async () => {
@@ -51,40 +109,53 @@ async function renderGyms(card) {
   );
 }
 
-async function renderTemplates(card) {
-  const [templates, exercises] = await Promise.all([listTemplates(), exerciseMap()]);
+// ---------- Záloha ----------
+function renderBackup(card) {
   card.replaceChildren(
-    el('h2', { class: 'card-title', text: 'Typy tréninků' }),
-    el('p', { class: 'muted small', text: 'Úpravy šablon (cviky, série, váhy) přibudou v dalším kroku stavby.' }),
-    ...templates.map((t) => el('details', { class: 'accordion' }, [
-      el('summary', {}, [
-        el('span', { class: 'accordion-title', text: `${t.order}. ${t.name}` }),
-        el('span', { class: 'muted small', text: t.subtitle }),
-      ]),
-      t.exercises.length
-        ? el('ul', { class: 'list' }, t.exercises.map((item) => {
-          const ex = exercises.get(item.exerciseId);
-          return el('li', { class: 'list-row list-row-stacked' }, [
-            el('span', { class: 'list-main', text: ex?.name ?? item.exerciseId }),
-            el('span', { class: 'muted small', text: describeTemplateItem(item, ex) }),
-          ]);
-        }))
-        : el('p', { class: 'muted small', text: 'Zatím bez cviků.' }),
-    ])),
+    el('h2', { class: 'card-title', text: 'Záloha dat' }),
+    el('p', { class: 'muted small', text: 'Export uloží všechna data včetně vlastních fotek do souboru. Na iPhonu zvol „Uložit do Souborů“.' }),
+    el('div', { class: 'row-2' }, [
+      el('button', {
+        type: 'button', class: 'btn btn-primary', text: 'Exportovat',
+        onclick: async (e) => {
+          const btn = e.currentTarget;
+          btn.disabled = true;
+          try {
+            const result = await shareBackup();
+            if (result === 'downloaded') toast('Záloha stažena');
+          } catch (err) {
+            console.error(err);
+            toast('Export selhal');
+          } finally {
+            btn.disabled = false;
+          }
+        },
+      }),
+      el('button', {
+        type: 'button', class: 'btn', text: 'Importovat',
+        onclick: async () => {
+          const data = await pickBackupFile();
+          if (!data) return;
+          if (data.error) { toast(data.error); return; }
+          let info;
+          try { info = inspectBackup(data); } catch (err) { toast(err.message); return; }
+          const ok = await confirmDialog({
+            title: 'Přepsat současná data?',
+            text: `Záloha z ${info.exportedAt ? dateShort.format(new Date(info.exportedAt)) : '?'}: ${plural(info.workouts, ['trénink', 'tréninky', 'tréninků'])}, ${plural(info.exercises, ['cvik', 'cviky', 'cviků'])}, ${plural(info.photos, ['obrázek', 'obrázky', 'obrázků'])}. Všechna data v appce se nahradí obsahem zálohy.`,
+            okLabel: 'Přepsat', danger: true,
+          });
+          if (!ok) return;
+          try {
+            await importData(data);
+            toast('Data obnovena');
+            setTimeout(() => { location.hash = '#/domu'; location.reload(); }, 600);
+          } catch (err) {
+            console.error(err);
+            toast('Import selhal, data zůstala beze změny');
+          }
+        },
+      }),
+    ]),
   );
 }
 
-// „+15 kg, 3 × 8, pauza 5 min“ nebo popis drop setu
-export function describeTemplateItem(item, exercise) {
-  const bw = exercise?.bodyweight;
-  if (item.mode === 'dropset') {
-    const steps = item.steps.map((s) => `${formatWeight(s.weight, { bodyweight: bw })} × ${s.reps}`).join(' → ');
-    return `${item.rounds} kola: ${steps}, pauza ${formatRest(item.rest)} mezi koly`;
-  }
-  const first = item.sets[0];
-  const same = item.sets.every((s) => s.weight === first.weight && s.reps === first.reps && s.seconds === first.seconds && s.rest === first.rest);
-  const value = (s) => (exercise?.type === 'time' ? `${s.seconds} s` : `${s.reps}`);
-  const load = (s) => (exercise?.type === 'reps' ? '' : `${formatWeight(s.weight, { bodyweight: bw })}, `);
-  if (same) return `${load(first)}${item.sets.length} × ${value(first)}, pauza ${formatRest(first.rest)}`;
-  return item.sets.map((s) => `${load(s)}${value(s)}`).join(' | ') + `, pauza ${formatRest(first.rest)}`;
-}

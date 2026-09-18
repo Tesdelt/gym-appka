@@ -1,6 +1,7 @@
 import { addRoute, startRouter } from './router.js';
 import { openDB, requestPersistentStorage } from './db.js';
 import { seedIfEmpty } from './seed.js';
+import { applyTheme } from './theme.js';
 import * as home from './views/home.js';
 import * as stats from './views/stats.js';
 import * as goals from './views/goals.js';
@@ -9,6 +10,7 @@ import * as settings from './views/settings.js';
 import * as workout from './views/workout.js';
 import * as summary from './views/summary.js';
 import * as exercise from './views/exercise.js';
+import * as template from './views/template.js';
 
 addRoute('domu', home);
 addRoute('statistiky', stats);
@@ -18,12 +20,14 @@ addRoute('nastaveni', settings);
 addRoute('trenink', workout);
 addRoute('souhrn', summary);
 addRoute('cvik', exercise);
+addRoute('sablona', template);
 
 const viewEl = document.getElementById('view');
 const titleEl = document.getElementById('screen-title');
 const extraEl = document.getElementById('topbar-extra');
 const tabs = document.querySelectorAll('.tab');
 
+applyTheme();
 init();
 
 async function init() {

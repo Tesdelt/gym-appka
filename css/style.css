@@ -22,15 +22,21 @@
 }
 
 :root[data-theme="light"] {
-  --bg: #F2F0EC;
+  --bg: #EFEDE9;
   --surface: #FFFFFF;
-  --border: #D6D3CE;
+  --border: #D3CFC9;
   --accent: #7A1C2A;
   --danger: #B0141E;
-  --gold: #9A7420;
+  --gold: #8C6A1E;
   --text: #161618;
-  --text-2: #6B6864;
+  --text-2: #66625E;
 }
+/* horní lišta zůstává tmavá: stavový řádek iOS má v appce z plochy bílý text */
+:root[data-theme="light"] .topbar { background: #0A0A0A; border-bottom-color: #0A0A0A; color: #ECEAE6; }
+:root[data-theme="light"] .topbar .btn:not(.btn-primary):not(.btn-danger) { background: #161618; border-color: #2A2A2D; color: #ECEAE6; }
+:root[data-theme="light"] .ex-image .ex-image-pic.is-empty, :root[data-theme="light"] .is-empty { color: var(--border); }
+:root[data-theme="light"] .btn-done.is-next-exercise { background: #5E1520; }
+:root[data-theme="light"] .toast { background: #161618; color: #ECEAE6; }
 
 /* ---------- Základ ---------- */
 *, *::before, *::after { box-sizing: border-box; }
@@ -481,8 +487,8 @@ select.input {
   flex: none; width: 36px; min-height: var(--tap); display: flex; align-items: center; justify-content: center;
   font-size: 22px; color: var(--text-2); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
 }
-.ex-row.is-dragging, .ex-row.is-picked { background: var(--bg); box-shadow: 0 0 0 1px var(--accent); }
-.ex-row.is-picked .drag-handle { color: var(--gold); }
+.is-dragging, .is-picked { background: var(--bg); box-shadow: 0 0 0 1px var(--accent); }
+.is-picked .drag-handle { color: var(--gold); }
 .drag-list .list-row { padding-right: 4px; }
 .sign-btn { flex: none; width: 48px; min-height: 56px; font-size: 26px; }
 .sign-btn.is-selected { background: var(--accent); border-color: var(--accent); }
@@ -580,3 +586,21 @@ input[type="date"].input { min-height: var(--tap); line-height: var(--tap); }
 .chart-dot.is-manual.is-gold { fill: var(--surface); stroke: var(--gold); }
 
 .input-static { display: flex; align-items: center; color: var(--text-2); background: transparent; }
+
+/* ---------- Úprava typu tréninku ---------- */
+.top-gap { margin-top: 10px; }
+.chevron { flex: none; padding: 0 6px; font-size: 24px; color: var(--text-2); }
+.link-btn { padding: 0; border: 0; background: none; color: var(--text); font: inherit; font-weight: 600; text-align: right; cursor: pointer; min-height: 32px; }
+.set-card { padding: 10px 0 12px; border-top: 1px solid var(--border); }
+.set-card:first-of-type { border-top: 0; padding-top: 0; }
+.set-card-head { display: flex; justify-content: space-between; align-items: center; min-height: 36px; }
+.set-card-title { font-weight: 700; }
+.set-grid { display: grid; gap: 8px; margin-bottom: 8px; }
+.set-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+.set-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+.set-grid .edit-row { margin: 0; min-width: 0; }
+.set-grid .field-label { font-size: 12px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.set-grid .stepper-btn { width: 30px; min-height: 44px; font-size: 20px; }
+.set-grid .edit-field { font-size: 19px; padding: 0 2px; min-height: 44px; }
+.set-grid.cols-2 .stepper-btn { width: 40px; }
+.set-grid.cols-2 .edit-field { font-size: 22px; }
