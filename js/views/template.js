@@ -13,6 +13,7 @@ import {
 import {
   el, promptText, confirmDialog, openDialog, toast, stepField, dragHandle, makeSortable, formatWeight, formatRest, plural,
 } from '../ui.js';
+import { imageBox } from '../images.js';
 import { navigate, goBack } from '../router.js';
 import { pickExercise } from '../exercisePicker.js';
 import { rangeFor } from '../recommend.js';
@@ -42,14 +43,56 @@ async function renderTemplate(container, template, titleEl) {
   const redraw = () => { container.replaceChildren(); renderTemplate(container, template, titleEl); };
   const save = async () => { await saveTemplate(template); };
 
-  const list = el('ul', { class: 'list drag-list' }, template.exercises.map((item, i) => {
+  // Nahoře v liště: čtvereček s barvou a název (klepnutím se přejmenuje)
+  const drawTitle = () => {
+    titleEl.className = 'screen-title title-edit';
+    titleEl.replaceChildren(
+      el('button', {
+        type: 'button', class: 'title-swatch', 'aria-label': t('Barva typu tréninku'),
+        style: templateColor(template.color) ? `background: ${templateColor(template.color)}` : '',
+        onclick: async () => {
+          const key = await pickColor(template.color ?? null);
+          if (key === undefined) return;
+          template.color = key;
+          await save();
+          drawTitle();
+        },
+      }),
+      el('button', {
+        type: 'button', class: 'title-name', text: template.name, 'aria-label': t('Přejmenovat'),
+        onclick: async () => {
+          const name = await promptText({ title: t('Název typu tréninku'), value: template.name });
+          if (!name) return;
+          template.name = name;
+          await save();
+          drawTitle();
+        },
+      }),
+    );
+  };
+  drawTitle();
+
+  const list = el('ul', { class: 'list drag-list tpl-list' }, template.exercises.map((item, i) => {
     const ex = exercises.get(item.exerciseId);
-    return el('li', { class: 'list-row', 'data-index': i }, [
+    const detail = el('span', { class: 'muted small block tpl-detail', text: describeItem(item, ex) });
+    const row = el('li', { class: 'list-row tpl-row', 'data-index': i }, [
       dragHandle(),
-      el('button', { type: 'button', class: 'list-main', onclick: () => navigate(`sablona/${encodeURIComponent(template.id)}/${i}`) }, [
-        el('span', { class: 'block', text: ex ? exName(ex) : t('Smazaný cvik') }),
-        el('span', { class: 'muted small block', text: describeItem(item, ex) }),
+      el('button', { type: 'button', class: 'list-main tpl-main', onclick: () => navigate(`sablona/${encodeURIComponent(template.id)}/${i}`) }, [
+        imageBox(ex, { cls: 'tpl-pic' }),
+        el('span', { class: 'tpl-text' }, [
+          el('span', { class: 'block', text: ex ? exName(ex) : t('Smazaný cvik') }),
+          detail,
+        ]),
       ]),
+      el('button', {
+        type: 'button', class: 'btn btn-small btn-icon tpl-toggle', text: '⌄', 'aria-expanded': 'false',
+        'aria-label': t('Zobrazit série'),
+        onclick: (e) => {
+          const open = row.classList.toggle('is-open');
+          e.currentTarget.setAttribute('aria-expanded', String(open));
+          e.currentTarget.textContent = open ? '⌃' : '⌄';
+        },
+      }),
       el('button', {
         type: 'button', class: 'btn btn-small btn-icon', html: '&times;', 'aria-label': t('Odebrat cvik'),
         onclick: async () => {
@@ -60,6 +103,7 @@ async function renderTemplate(container, template, titleEl) {
         },
       }),
     ]);
+    return row;
   }));
   makeSortable(list, async (order) => {
     template.exercises = order.map((i) => template.exercises[i]);
@@ -67,52 +111,36 @@ async function renderTemplate(container, template, titleEl) {
     redraw();
   });
 
+  const addExercise = async () => {
+    const ex = await pickExercise({ title: t('Přidat cvik'), exclude: template.exercises.map((e) => e.exerciseId) });
+    if (!ex) return;
+    template.exercises.push(defaultTemplateItem(ex));
+    await save();
+    navigate(`sablona/${encodeURIComponent(template.id)}/${template.exercises.length - 1}`);
+  };
+
+  // Popis: klepnutím se rovnou píše, ukládá se průběžně
+  const subtitle = el('input', {
+    type: 'text', class: 'input tpl-subtitle', placeholder: t('Popis, např. záda, biceps'), autocomplete: 'off', autocapitalize: 'sentences',
+  });
+  subtitle.value = template.subtitle ?? '';
+  let timer = null;
+  subtitle.addEventListener('input', () => {
+    template.subtitle = subtitle.value.trim();
+    clearTimeout(timer);
+    timer = setTimeout(save, 400);
+  });
+  subtitle.addEventListener('blur', save);
+
   container.append(el('div', { class: 'stack' }, [
-    el('section', { class: 'card' }, [
-      el('dl', { class: 'kv' }, [
-        editRow(t('Název'), template.name, async () => {
-          const name = await promptText({ title: t('Název typu tréninku'), value: template.name });
-          if (name) { template.name = name; titleEl.textContent = name; await save(); redraw(); }
-        }),
-        el('div', { class: 'kv-row' }, [
-          el('dt', { text: t('Barva') }),
-          el('dd', {}, [el('button', {
-            type: 'button', class: 'color-btn',
-            onclick: async () => {
-              const key = await pickColor(template.color ?? null);
-              if (key === undefined) return;
-              template.color = key;
-              await save();
-              redraw();
-            },
-          }, [
-            el('span', { class: 'swatch', style: templateColor(template.color) ? `background: ${templateColor(template.color)}` : '' }),
-            el('span', { text: TEMPLATE_COLORS.find((c) => c.key === template.color)?.name ?? t('Bez barvy') }),
-            el('span', { class: 'muted', text: ' ✎' }),
-          ])]),
-        ]),
-        editRow(t('Popis'), template.subtitle || '–', async () => {
-          const text = await promptText({ title: t('Popis (partie)'), value: template.subtitle ?? '', placeholder: t('např. záda, biceps') });
-          if (text != null) { template.subtitle = text; await save(); redraw(); }
-        }),
-      ]),
-    ]),
+    el('section', { class: 'card' }, [subtitle]),
     el('section', { class: 'card' }, [
       el('h2', { class: 'card-title', text: t('Cviky') }),
       template.exercises.length
-        ? el('p', { class: 'muted small', text: t('Klepnutím upravíš série. Pořadí změníš tažením za ≡ (nebo klepni na ≡ a pak na ≡ cíle).') })
+        ? el('p', { class: 'muted small', text: t('Klepnutím upravíš série, ⌄ ukáže váhy a opakování. Pořadí změníš podržením ≡ a tažením (nebo klepni na ≡ a pak na ≡ cíle).') })
         : el('p', { class: 'muted small', text: t('Zatím bez cviků.') }),
       list,
-      el('button', {
-        type: 'button', class: 'btn btn-primary', text: t('+ Přidat cvik'),
-        onclick: async () => {
-          const ex = await pickExercise({ title: t('Přidat cvik'), exclude: template.exercises.map((e) => e.exerciseId) });
-          if (!ex) return;
-          template.exercises.push(defaultTemplateItem(ex));
-          await save();
-          navigate(`sablona/${encodeURIComponent(template.id)}/${template.exercises.length - 1}`);
-        },
-      }),
+      el('button', { type: 'button', class: 'tpl-add', text: '+', 'aria-label': t('Přidat cvik'), onclick: addExercise }),
     ]),
     el('p', { class: 'muted small', text: t('Úpravy platí od dalšího tréninku. Uložené tréninky v historii se nemění.') }),
     el('button', {
@@ -126,13 +154,6 @@ async function renderTemplate(container, template, titleEl) {
       },
     }),
   ]));
-}
-
-function editRow(label, value, onclick) {
-  return el('div', { class: 'kv-row' }, [
-    el('dt', { text: label }),
-    el('dd', {}, [el('button', { type: 'button', class: 'link-btn', text: `${value} ✎`, onclick })]),
-  ]);
 }
 
 export function describeItem(item, exercise) {

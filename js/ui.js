@@ -182,10 +182,15 @@ export function stepField(label, value, step, min = null, onChange = null, { sna
   return { root, input, value: read, set: (v) => { input.value = fmt(v); } };
 }
 
-// Řazení seznamu: řádky <li data-index> s úchytem .drag-handle. Řádek se za
-// úchyt táhne prstem nebo myší. Klepnutí na úchyt řádek „vezme“ (zezlátne)
-// a klepnutí na jiný úchyt ho vloží před tento řádek.
+// Řazení seznamu: řádky <li data-index> s úchytem .drag-handle.
+// Řádek se vezme až po krátkém podržení úchytu – do té doby jde stránkou
+// scrollovat. Při tažení se řádek veze s prstem a ostatní plynule uhýbají.
+// Krátké klepnutí na úchyt řádek „vezme“ (zezlátne) a klepnutí na jiný úchyt
+// ho vloží před tento řádek.
 // onReorder(order) dostane nové pořadí původních indexů.
+const DRAG_HOLD = 260; // ms podržení, než se řádek začne přesouvat
+const DRAG_SLOP = 10; // px pohybu, které podržení ještě zruší (= scrollování)
+
 export function makeSortable(list, onReorder) {
   let picked = null;
   const rows = () => [...list.children].filter((r) => r.dataset.index != null);
@@ -195,14 +200,33 @@ export function makeSortable(list, onReorder) {
     const order = rows().map((r) => Number(r.dataset.index));
     if (order.some((v, i) => v !== i)) onReorder(order);
   };
-  const moveTo = (row, clientY) => {
+
+  // Přesune řádek na místo podle polohy prstu. Ostatní řádky se na nové místo
+  // přesunou plynule (doanimují se z původní pozice). Vrací posun taženého
+  // řádku, o který se musí dorovnat jeho transform.
+  const reorderTo = (row, clientY) => {
+    const tops = new Map(rows().map((r) => [r, r.getBoundingClientRect().top]));
     const target = rows().filter((r) => r !== row).find((r) => {
       const b = r.getBoundingClientRect();
       return clientY < b.top + b.height / 2;
     });
-    if (target) list.insertBefore(row, target);
-    else list.append(row);
+    if (target) {
+      if (target === row.nextElementSibling) return 0;
+      list.insertBefore(row, target);
+    } else {
+      if (row === list.lastElementChild) return 0;
+      list.append(row);
+    }
+    let shift = 0;
+    for (const [r, top] of tops) {
+      const now = r.getBoundingClientRect().top;
+      if (r === row) { shift = now - top; continue; }
+      if (Math.abs(now - top) < 1) continue;
+      r.animate?.([{ transform: `translateY(${top - now}px)` }, { transform: 'none' }], { duration: 150, easing: 'cubic-bezier(0.2, 0.9, 0.25, 1)' });
+    }
+    return shift;
   };
+
   for (const row of rows()) {
     const handle = row.querySelector('.drag-handle');
     if (!handle) continue;
@@ -212,32 +236,62 @@ export function makeSortable(list, onReorder) {
       list.insertBefore(picked, row);
       commit();
     };
+
+    // společný průběh pro dotyk i myš
+    const begin = (startClientY) => {
+      const st = { active: false, moved: false, cancelled: false, startY: startClientY };
+      st.timer = setTimeout(() => {
+        st.active = true;
+        row.classList.add('is-dragging');
+        navigator.vibrate?.(8);
+      }, DRAG_HOLD);
+      st.move = (clientY) => {
+        if (!st.active) {
+          // pohyb před podržením = scrollování, řádek se nebere
+          if (Math.abs(clientY - st.startY) > DRAG_SLOP) { clearTimeout(st.timer); st.cancelled = true; }
+          return false;
+        }
+        st.moved = true;
+        row.style.transform = `translateY(${clientY - st.startY}px)`;
+        const shift = reorderTo(row, clientY);
+        if (shift) {
+          st.startY += shift;
+          row.style.transform = `translateY(${clientY - st.startY}px)`;
+        }
+        return true;
+      };
+      st.end = () => {
+        clearTimeout(st.timer);
+        row.style.transform = '';
+        row.classList.remove('is-dragging');
+        if (st.active && st.moved) commit();
+        else if (!st.cancelled) tap();
+      };
+      return st;
+    };
+
     handle.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      let moved = false;
-      row.classList.add('is-dragging');
-      const onMove = (ev) => { moved = true; moveTo(row, ev.touches[0].clientY); };
+      const st = begin(e.touches[0].clientY);
+      const onMove = (ev) => { if (st.move(ev.touches[0].clientY)) ev.preventDefault(); };
       const onEnd = () => {
         handle.removeEventListener('touchmove', onMove);
         handle.removeEventListener('touchend', onEnd);
         handle.removeEventListener('touchcancel', onEnd);
-        row.classList.remove('is-dragging');
-        if (moved) commit(); else tap();
+        st.end();
       };
       handle.addEventListener('touchmove', onMove, { passive: false });
       handle.addEventListener('touchend', onEnd);
       handle.addEventListener('touchcancel', onEnd);
-    }, { passive: false });
+    }, { passive: true });
+
     handle.addEventListener('mousedown', (e) => {
       e.preventDefault();
-      let moved = false;
-      row.classList.add('is-dragging');
-      const onMove = (ev) => { moved = true; moveTo(row, ev.clientY); };
+      const st = begin(e.clientY);
+      const onMove = (ev) => st.move(ev.clientY);
       const onUp = () => {
         window.removeEventListener('mousemove', onMove);
         window.removeEventListener('mouseup', onUp);
-        row.classList.remove('is-dragging');
-        if (moved) commit(); else tap();
+        st.end();
       };
       window.addEventListener('mousemove', onMove);
       window.addEventListener('mouseup', onUp);

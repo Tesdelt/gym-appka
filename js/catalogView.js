@@ -14,7 +14,7 @@ import { listExercises } from './data.js';
 import { el, openDialog, normalize } from './ui.js';
 import { imageBox } from './images.js';
 import { loadCatalog, dbName, dbInstructions, thumbUrl } from './catalog.js';
-import { MUSCLE_GROUPS, matchesFilters, partLabel } from './muscles.js';
+import { MUSCLE_GROUPS, matchesFilters, partLabel, groupOf } from './muscles.js';
 import { t, lang, exName } from './i18n.js';
 
 // Stav hledání a filtrů je společný pro katalog i výběr cviku
@@ -62,10 +62,17 @@ export async function mountCatalog(host, { scrollRoot, onMine, onDb, onInfo = nu
     const myList = mine
       .filter((e) => matchesFilters(e.muscles, state.groups, state.parts) && hit(mineHay.get(e.id)))
       .sort((a, b) => exName(a).localeCompare(exName(b), lang));
+    // moje cviky po partiích (podle hlavních svalů; cvik může být u víc partií)
+    const byGroup = MUSCLE_GROUPS.map((g) => [g[lang], myList.filter((e) => (e.muscles?.primary ?? []).some((k) => groupOf(k) === g.key))]);
+    const rest = myList.filter((e) => !(e.muscles?.primary ?? []).some((k) => groupOf(k)));
+    if (rest.length) byGroup.push([t('Bez partie'), rest]);
     mineSection.replaceChildren(
       el('h2', { class: 'section-title', text: t('Moje cviky') }),
       myList.length
-        ? el('div', { class: 'cat-grid' }, myList.map((e) => card(exName(e), imageBox(e, { cls: 'cat-pic' }), () => onMine(e))))
+        ? el('div', {}, byGroup.filter(([, list]) => list.length).map(([label, list]) => el('div', { class: 'cat-group' }, [
+          el('h3', { class: 'cat-group-title' }, [el('span', { text: label }), el('span', { class: 'muted', text: String(list.length) })]),
+          el('div', { class: 'cat-grid' }, list.map((e) => card(exName(e), imageBox(e, { cls: 'cat-pic' }), () => onMine(e)))),
+        ])))
         : el('p', { class: 'muted small', text: mine.length ? t('Žádný z mých cviků neodpovídá.') : t('Zatím žádné. Klepni na cvik v katalogu níže a přidej ho.') }),
     );
 

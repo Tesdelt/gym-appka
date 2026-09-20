@@ -626,7 +626,7 @@ async function exerciseListSheet(workout, ctx) {
 
     body.append(
       el('h2', { class: 'dialog-title', text: t('Cviky v tréninku') }),
-      el('p', { class: 'muted small', text: t('Klepnutím na název přeskočíš na cvik. Pořadí změníš tažením za ≡, nebo klepni na ≡ u cviku a pak na ≡ tam, kam ho chceš vložit.') }),
+      el('p', { class: 'muted small', text: t('Klepnutím na název přeskočíš na cvik. Pořadí změníš podržením ≡ a tažením, nebo klepni na ≡ u cviku a pak na ≡ tam, kam ho chceš vložit.') }),
       list,
       el('div', { class: 'dialog-actions' }, [
         el('button', { type: 'button', class: 'btn', text: t('+ Přidat cvik'), onclick: add }),
