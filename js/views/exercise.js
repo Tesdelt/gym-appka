@@ -17,7 +17,8 @@ import { historyMarks } from '../marks.js';
 import { computeRecords, recordKey } from '../records.js';
 import { rangeChart } from '../chart.js';
 import { listManualRecords, manualAsWorkouts, exercisePoints, exerciseFormat, exerciseChartTitle } from '../stats.js';
-import { imageBox, pickPhoto, deleteImage, EQUIPMENT_FROM_DB } from '../images.js';
+import { pickPhoto, deleteImage, EQUIPMENT_FROM_DB } from '../images.js';
+import { exerciseAnim } from '../exerciseanim.js';
 import { DEFAULT_WEIGHT_STEP } from '../seed.js';
 import { loadCatalog, dbName, dbInstructions, thumbUrl, addFromCatalog } from '../catalog.js';
 import { MUSCLE_GROUPS, partLabel } from '../muscles.js';
@@ -91,7 +92,7 @@ async function renderDetail(container, exercise, extraEl) {
   ]);
 
   // Obrázek a název
-  const pic = imageBox(exercise, { cls: 'ex-hero', toggle: true });
+  const pic = exerciseAnim(exercise, { cls: 'ex-hero' });
   pic.style.viewTransitionName = 'ex-image';
   stack.append(el('section', { class: 'card ex-detail-head' }, [
     pic,
@@ -372,21 +373,13 @@ async function renderCatalogItem(container, dbId, extraEl) {
   container.append(stack);
 
   // fotky: plné z internetu, jinak náhled z appky
-  const hero = el('div', { class: 'ex-hero is-toggle' });
-  hero.style.viewTransitionName = 'ex-image';
-  const img = el('img', { alt: '', src: thumbUrl(meta) ?? '' });
-  hero.append(img);
-  const first = meta.t === 'time' && meta.i > 1 ? 1 : 0;
-  const frames = Array.from({ length: meta.i || 0 }, (_, i) => i).filter((i) => i >= first);
-  let frame = 0;
   const full = (i) => `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${encodeURIComponent(dbId)}/${i}.jpg`;
-  if (frames.length) {
-    const pre = new Image();
-    pre.onload = () => { img.src = pre.src; };
-    pre.src = full(frames[0]);
-    if (frames.length > 1) hero.addEventListener('click', () => { frame = (frame + 1) % frames.length; img.src = full(frames[frame]); });
-    else hero.classList.remove('is-toggle');
-  }
+  const hero = exerciseAnim({
+    images: Array.from({ length: Math.min(meta.i || 0, 2) }, (_, i) => full(i)),
+    type: meta.t,
+    muscles: { primary: meta.p, secondary: meta.s },
+  }, { cls: 'ex-hero' });
+  hero.style.viewTransitionName = 'ex-image';
 
   const equipment = EQUIPMENT_FROM_DB[meta.eq] ?? 'other';
   const addBtn = el('button', {

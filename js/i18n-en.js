@@ -413,9 +413,6 @@ export const EN = {
   'Olivová': 'Olive',
   'Grafitová': 'Graphite',
   // Nastavení
-  'Vzhled': 'Appearance',
-  'Tmavý': 'Dark',
-  'Světlý': 'Light',
   'Typy tréninků': 'Workout types',
   '+ Přidat typ tréninku': '+ Add workout type',
   'Nový typ tréninku': 'New workout type',

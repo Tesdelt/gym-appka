@@ -12,7 +12,7 @@
 
 import { listExercises } from './data.js';
 import { el, openDialog, normalize } from './ui.js';
-import { imageBox } from './images.js';
+import { exerciseAnim } from './exerciseanim.js';
 import { loadCatalog, dbName, dbInstructions, thumbUrl } from './catalog.js';
 import { MUSCLE_GROUPS, matchesFilters, partLabel, groupOf } from './muscles.js';
 import { t, lang, exName } from './i18n.js';
@@ -71,7 +71,7 @@ export async function mountCatalog(host, { scrollRoot, onMine, onDb, onInfo = nu
       myList.length
         ? el('div', {}, byGroup.filter(([, list]) => list.length).map(([label, list]) => el('div', { class: 'cat-group' }, [
           el('h3', { class: 'cat-group-title' }, [el('span', { text: label }), el('span', { class: 'muted', text: String(list.length) })]),
-          el('div', { class: 'cat-grid' }, list.map((e) => card(exName(e), imageBox(e, { cls: 'cat-pic' }), () => onMine(e)))),
+          el('div', { class: 'cat-grid' }, list.map((e) => card(exName(e), pic(e), () => onMine(e)))),
         ])))
         : el('p', { class: 'muted small', text: mine.length ? t('Žádný z mých cviků neodpovídá.') : t('Zatím žádné. Klepni na cvik v katalogu níže a přidej ho.') }),
     );
@@ -106,7 +106,7 @@ export async function mountCatalog(host, { scrollRoot, onMine, onDb, onInfo = nu
 
 function card(name, pic, onclick, onInfo = null) {
   const node = el('div', { class: 'cat-card', role: 'button', tabindex: '0', onclick }, [
-    el('span', { class: 'cat-name', text: name }),
+    el('span', { class: 'cat-name-box' }, [el('span', { class: 'cat-name', text: name })]),
     pic,
   ]);
   node.addEventListener('keydown', (e) => { if (e.key === 'Enter') onclick(); });
@@ -119,12 +119,14 @@ function card(name, pic, onclick, onInfo = null) {
   return node;
 }
 
+// v mřížce stačí první fáze pohybu (cvik bez fotek dostane svalovou mapu)
+function pic(exercise) {
+  return exerciseAnim(exercise, { cls: 'cat-pic', play: false });
+}
+
+// cvik z katalogu, který ještě nemám: náhled z repozitáře appky
 function dbPic(meta) {
-  const url = thumbUrl(meta);
-  const box = el('div', { class: `cat-pic ${url ? '' : 'is-empty'}` });
-  if (url) box.append(el('img', { src: url, alt: '', loading: 'lazy', decoding: 'async' }));
-  else box.innerHTML = '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 32h44M14 22v20M20 18v28M44 18v28M50 22v20"/></svg>';
-  return box;
+  return exerciseAnim({ images: [thumbUrl(meta)].filter(Boolean), muscles: { primary: meta.p, secondary: meta.s } }, { cls: 'cat-pic', play: false });
 }
 
 function chip(text, onRemove, isolated = false) {
@@ -182,17 +184,14 @@ function checkRow(label, checked, onToggle) {
 // Náhled cviku z katalogu v dialogu (fotka, partie, postup). Vrací true = přidat.
 export function previewDialog(meta, addLabel = t('Přidat')) {
   return openDialog((close) => {
-    const img = el('img', { alt: '', src: thumbUrl(meta) ?? '' });
-    const first = meta.t === 'time' && meta.i > 1 ? 1 : 0;
-    if (meta.i) {
-      const pre = new Image();
-      pre.onload = () => { img.src = pre.src; };
-      pre.src = `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${encodeURIComponent(meta.id)}/${first}.jpg`;
-    }
+    const frames = meta.i
+      ? Array.from({ length: Math.min(meta.i, 2) }, (_, i) => `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${encodeURIComponent(meta.id)}/${i}.jpg`)
+      : [thumbUrl(meta)].filter(Boolean);
+    const pic = exerciseAnim({ images: frames, type: meta.t, muscles: { primary: meta.p, secondary: meta.s } }, { cls: 'preview-pic' });
     const instructions = el('p', { class: 'prose small' });
     dbInstructions(meta.id).then((text) => { instructions.textContent = text; });
     return el('div', { class: 'dialog-body preview-body' }, [
-      el('div', { class: 'preview-pic' }, [img]),
+      pic,
       el('h2', { class: 'dialog-title', text: dbName(meta) }),
       el('p', { class: 'muted small', text: `${t('Hlavní')}: ${meta.p.map((k) => partLabel(k, lang)).join(', ')}` }),
       meta.s.length ? el('p', { class: 'muted small', text: `${t('Vedlejší')}: ${meta.s.map((k) => partLabel(k, lang)).join(', ')}` }) : null,

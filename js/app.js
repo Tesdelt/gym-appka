@@ -1,7 +1,6 @@
 import { addRoute, startRouter } from './router.js';
 import { openDB, requestPersistentStorage } from './db.js';
 import { seedIfEmpty, translateDbExercises, upgradeExerciseData, applyRestRule, fixCableCurl } from './seed.js';
-import { applyTheme } from './theme.js';
 import { transition } from './fx.js';
 import { fillMissingImages } from './catalog.js';
 import { t, lang } from './i18n.js';
@@ -31,7 +30,6 @@ const extraEl = document.getElementById('topbar-extra');
 const actionEl = document.getElementById('actionbar');
 const tabs = document.querySelectorAll('.tab');
 
-applyTheme();
 translateStatic();
 init();
 

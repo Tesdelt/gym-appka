@@ -13,7 +13,7 @@ import {
 import {
   el, promptText, confirmDialog, openDialog, toast, stepField, dragHandle, makeSortable, formatWeight, formatRest, plural,
 } from '../ui.js';
-import { imageBox } from '../images.js';
+import { exerciseAnim } from '../exerciseanim.js';
 import { navigate, goBack } from '../router.js';
 import { pickExercise } from '../exercisePicker.js';
 import { rangeFor } from '../recommend.js';
@@ -78,7 +78,7 @@ async function renderTemplate(container, template, titleEl) {
     const row = el('li', { class: 'list-row tpl-row', 'data-index': i }, [
       dragHandle(),
       el('button', { type: 'button', class: 'list-main tpl-main', onclick: () => navigate(`sablona/${encodeURIComponent(template.id)}/${i}`) }, [
-        imageBox(ex, { cls: 'tpl-pic' }),
+        exerciseAnim(ex, { cls: 'tpl-pic', play: false }),
         el('span', { class: 'tpl-text' }, [
           el('span', { class: 'block', text: ex ? exName(ex) : t('Smazaný cvik') }),
           detail,

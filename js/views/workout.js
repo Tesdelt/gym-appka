@@ -5,7 +5,7 @@ import { navigate } from '../router.js';
 import { listTemplates } from '../data.js';
 import { slotsOf, SET_TAGS, hasTag } from '../recommend.js';
 import { pickExercise } from '../exercisePicker.js';
-import { imageBox } from '../images.js';
+import { exerciseAnim } from '../exerciseanim.js';
 import { exerciseMap } from '../data.js';
 import { computeRecords, recordKey } from '../records.js';
 import { listManualRecords, manualAsWorkouts } from '../stats.js';
@@ -174,7 +174,7 @@ function currentCard(workout, cur, ctx) {
   // Obrázek + minule / doporučení
   card.append(el('div', { class: 'ex-media' }, [
     el('button', { type: 'button', class: 'ex-image', 'aria-label': t('Podrobnosti cviku'), onclick: () => navigate(`cvik/${encodeURIComponent(entry.exerciseId)}`) }, [
-      Object.assign(imageBox(ctx.exercises.get(entry.exerciseId), { cls: 'ex-image-pic' }), { style: 'view-transition-name: ex-image' }),
+      exerciseAnim(ctx.exercises.get(entry.exerciseId), { cls: 'ex-image-pic' }),
       el('span', { class: 'ex-image-label', text: t('Podrobnosti') }),
     ]),
     el('div', { class: 'ex-meta' }, [

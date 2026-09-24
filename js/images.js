@@ -41,30 +41,6 @@ export async function exerciseImageUrls(exercise) {
   return urls.filter(Boolean);
 }
 
-// <div class="ex-pic"> s obrázkem, nebo zástupným symbolem. Klepnutí přepíná
-// mezi fázemi pohybu (u obrázků z databáze jsou dvě).
-export function imageBox(exercise, { cls = 'ex-pic', toggle = false } = {}) {
-  const box = document.createElement('div');
-  box.className = `${cls} is-empty`;
-  box.innerHTML = PLACEHOLDER_SVG;
-  exerciseImageUrls(exercise).then((urls) => {
-    if (!urls.length) return;
-    let i = 0;
-    const img = document.createElement('img');
-    img.alt = '';
-    img.decoding = 'async';
-    img.src = urls[0];
-    box.replaceChildren(img);
-    box.classList.remove('is-empty');
-    if (toggle && urls.length > 1) {
-      box.classList.add('is-toggle');
-      box.addEventListener('click', () => { i = (i + 1) % urls.length; img.src = urls[i]; });
-    }
-  });
-  return box;
-}
-
-// Zmenšení fotky na max. `max` px na delší straně, výstup JPEG
 export async function resizeImage(blob, max = 1200, quality = 0.85) {
   let source;
   try {
@@ -205,5 +181,3 @@ export const EQUIPMENT_FROM_DB = {
   other: 'other',
 };
 
-export const PLACEHOLDER_SVG = `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" aria-hidden="true">
-  <path d="M10 32h44M14 22v20M20 18v28M44 18v28M50 22v20"/></svg>`;

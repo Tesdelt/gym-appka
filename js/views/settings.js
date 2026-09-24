@@ -6,7 +6,6 @@ import {
 import { el, promptText, confirmDialog, openDialog, toast, plural, dragHandle, makeSortable, dateShort } from '../ui.js';
 import { navigate } from '../router.js';
 import { renderDiagnostics } from '../diagnostics.js';
-import { getTheme, setTheme } from '../theme.js';
 import { shareBackup, pickBackupFile, inspectBackup, importData, backupStatus, isHistoryFile, historyOverlap, importHistory } from '../backup.js';
 import { t, lang, setLang } from '../i18n.js';
 
@@ -16,30 +15,16 @@ export function render(container) {
   const wrap = el('div', { class: 'stack' });
   container.append(wrap);
 
-  const themeCard = el('section', { class: 'card' });
   const langCard = el('section', { class: 'card' });
   const templatesCard = el('section', { class: 'card' });
   const gymsCard = el('section', { class: 'card' });
   const backupCard = el('section', { class: 'card' });
-  wrap.append(themeCard, langCard, templatesCard, gymsCard, backupCard);
-  renderTheme(themeCard);
+  wrap.append(langCard, templatesCard, gymsCard, backupCard);
   renderLang(langCard);
   renderTemplates(templatesCard);
   renderGyms(gymsCard);
   renderBackup(backupCard);
   renderDiagnostics(wrap);
-}
-
-// ---------- Vzhled ----------
-function renderTheme(card) {
-  const current = getTheme();
-  card.replaceChildren(
-    el('h2', { class: 'card-title', text: t('Vzhled') }),
-    el('div', { class: 'segmented' }, [['dark', t('Tmavý')], ['light', t('Světlý')]].map(([key, label]) => el('button', {
-      type: 'button', class: `seg ${current === key ? 'is-selected' : ''}`, text: label,
-      onclick: () => { setTheme(key); renderTheme(card); },
-    }))),
-  );
 }
 
 // ---------- Jazyk ----------
